@@ -1,329 +1,298 @@
 import React, { useState, useEffect } from 'react';
-import { Student, StudentStatus, Gender, Religion, SpecialNeeds } from '../types';
-import { X, Save, User, ShieldCheck } from 'lucide-react';
+import { Student } from '../types';
+import { X, User } from 'lucide-react';
 
 interface StudentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (studentData: Partial<Student>) => void;
-  initialData?: Student | null;
+  onSave?: (student: Partial<Student>) => void;
+  student?: Student | null;
+  mode: 'add' | 'edit' | 'view';
 }
 
 export const StudentModal: React.FC<StudentModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  initialData,
+  student,
+  mode,
 }) => {
   const [formData, setFormData] = useState<Partial<Student>>({
+    name: '',
     nisn: '',
     nis: '',
-    name: '',
+    class: 'X IPA 1',
+    major: 'IPA',
     gender: 'L',
-    religion: 'Islam',
-    specialNeeds: 'Tidak Ada',
-    class: '10 MIPA 1',
-    major: 'MIPA',
-    generation: '2025/2026',
-    entryYear: 2025,
     status: 'Aktif',
-    birthPlace: '',
-    birthDate: '',
-    address: '',
+    violationPoints: 0,
     phone: '',
     parentName: '',
     parentPhone: '',
+    address: '',
+    birthPlace: '',
+    birthDate: '',
+    photo: '',
     notes: '',
   });
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
+    if (student && (mode === 'edit' || mode === 'view')) {
+      setFormData(student);
     } else {
       setFormData({
+        name: '',
         nisn: '',
         nis: '',
-        name: '',
+        class: 'X IPA 1',
+        major: 'IPA',
         gender: 'L',
-        religion: 'Islam',
-        specialNeeds: 'Tidak Ada',
-        class: '10 MIPA 1',
-        major: 'MIPA',
-        generation: '2025/2026',
-        entryYear: 2025,
         status: 'Aktif',
-        birthPlace: '',
-        birthDate: '',
-        address: '',
+        violationPoints: 0,
         phone: '',
         parentName: '',
         parentPhone: '',
+        address: '',
+        birthPlace: '',
+        birthDate: '',
+        photo: '',
         notes: '',
       });
     }
-  }, [initialData, isOpen]);
+  }, [student, mode, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.nisn || !formData.class) {
-      alert('Nama, NISN, dan Kelas wajib diisi!');
-      return;
+    if (onSave) {
+      onSave(formData);
     }
-    onSave(formData);
     onClose();
   };
 
+  const isReadOnly = mode === 'view';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl text-slate-900 overflow-hidden my-8">
-        
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden my-8 transform transition-all">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <User className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-black text-slate-900">
-              {initialData ? 'Edit Data Siswa' : 'Tambah Siswa Baru'}
-            </h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 rounded-2xl bg-blue-50 text-blue-600 font-bold">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900">
+                {mode === 'add' && 'Tambah Data Siswa'}
+                {mode === 'edit' && 'Edit Data Siswa'}
+                {mode === 'view' && 'Detail Data Siswa'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {mode === 'view' ? 'Informasi profil dan rekam data siswa' : 'Isi formulir berikut dengan data yang valid'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* NISN */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">NISN *</label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: 0061234567"
-                value={formData.nisn || ''}
-                onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        {/* Form Content */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Photo & Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-slate-100">
+            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <div className="w-24 h-24 rounded-full bg-slate-200 border-2 border-white shadow-md flex items-center justify-center overflow-hidden mb-2 relative group">
+                {formData.photo ? (
+                  <img src={formData.photo} alt={formData.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-black text-slate-400">
+                    {formData.name ? formData.name.charAt(0).toUpperCase() : '?'}
+                  </span>
+                )}
+              </div>
+              {!isReadOnly && (
+                <input
+                  type="text"
+                  placeholder="URL Foto Siswa..."
+                  value={formData.photo || ''}
+                  onChange={(e) => setFormData({ ...formData, photo: e.target.value })}
+                  className="w-full text-[11px] p-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
             </div>
 
-            {/* NIS */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">NIS Sekolah</label>
-              <input
-                type="text"
-                placeholder="Contoh: 23241001"
-                value={formData.nis || ''}
-                onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <div className="md:col-span-2 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap *</label>
+                <input
+                  type="text"
+                  required
+                  disabled={isReadOnly}
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Masukkan nama lengkap siswa"
+                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+                />
+              </div>
 
-            {/* Nama Lengkap */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-800 mb-1">Nama Lengkap Siswa *</label>
-              <input
-                type="text"
-                required
-                placeholder="Nama sesuai ijazah / KK"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">NISN *</label>
+                  <input
+                    type="text"
+                    required
+                    disabled={isReadOnly}
+                    value={formData.nisn || ''}
+                    onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
+                    placeholder="10 digit NISN"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">NIS</label>
+                  <input
+                    type="text"
+                    disabled={isReadOnly}
+                    value={formData.nis || ''}
+                    onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
+                    placeholder="Nomor Induk Sekolah"
+                    className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+                  />
+                </div>
+              </div>
             </div>
-
-            {/* Jenis Kelamin */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Jenis Kelamin</label>
-              <select
-                value={formData.gender || 'L'}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value as Gender })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="L">Laki-laki (L)</option>
-                <option value="P">Perempuan (P)</option>
-              </select>
-            </div>
-
-            {/* Agama */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Agama</label>
-              <select
-                value={formData.religion || 'Islam'}
-                onChange={(e) => setFormData({ ...formData, religion: e.target.value as Religion })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Islam">Islam</option>
-                <option value="Kristen">Kristen Protestan</option>
-                <option value="Katolik">Katolik</option>
-                <option value="Hindu">Hindu</option>
-                <option value="Buddha">Buddha</option>
-                <option value="Khonghucu">Khonghucu</option>
-                <option value="Lainnya">Lainnya</option>
-              </select>
-            </div>
-
-            {/* Kebutuhan Khusus / Inklusi */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Kebutuhan Khusus / Inklusi</label>
-              <select
-                value={formData.specialNeeds || 'Tidak Ada'}
-                onChange={(e) => setFormData({ ...formData, specialNeeds: e.target.value as SpecialNeeds })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Tidak Ada">Tidak Ada (Non-Disabilitas)</option>
-                <option value="Tunanetra (A)">Tunanetra (A)</option>
-                <option value="Tunarungu (B)">Tunarungu (B)</option>
-                <option value="Tunagrahita (C)">Tunagrahita (C)</option>
-                <option value="Tunadaksa (D)">Tunadaksa (D)</option>
-                <option value="Tunalaras (E)">Tunalaras (E)</option>
-                <option value="Autis">Autis</option>
-                <option value="ADHD">ADHD</option>
-                <option value="Kesulitan Belajar">Kesulitan Belajar</option>
-                <option value="Cerdas Istimewa">Cerdas Istimewa (Gifted)</option>
-                <option value="Lainnya">Lainnya</option>
-              </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Status Keaktifan</label>
-              <select
-                value={formData.status || 'Aktif'}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as StudentStatus })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Aktif">Aktif</option>
-                <option value="Lulus">Lulus / Alumni</option>
-                <option value="Mutasi">Mutasi / Keluar</option>
-                <option value="DO">Drop Out (DO)</option>
-              </select>
-            </div>
-
-            {/* Kelas */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Kelas *</label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: 10 MIPA 1, 11 RPL 2"
-                value={formData.class || ''}
-                onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Jurusan */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Jurusan / Peminatan</label>
-              <input
-                type="text"
-                placeholder="Contoh: MIPA, IPS, RPL, TKJ"
-                value={formData.major || ''}
-                onChange={(e) => setFormData({ ...formData, major: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Angkatan */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Tahun Angkatan</label>
-              <input
-                type="text"
-                placeholder="Contoh: 2024/2025"
-                value={formData.generation || ''}
-                onChange={(e) => setFormData({ ...formData, generation: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Tahun Masuk */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Tahun Masuk</label>
-              <input
-                type="number"
-                value={formData.entryYear || 2025}
-                onChange={(e) => setFormData({ ...formData, entryYear: parseInt(e.target.value) || 2025 })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* No HP Siswa */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">No. HP / WA Siswa</label>
-              <input
-                type="text"
-                placeholder="08123456789"
-                value={formData.phone || ''}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Nama Orang Tua */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Nama Orang Tua / Wali</label>
-              <input
-                type="text"
-                placeholder="Nama Ayah/Ibu/Wali"
-                value={formData.parentName || ''}
-                onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Alamat */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-800 mb-1">Alamat Tempat Tinggal</label>
-              <textarea
-                rows={2}
-                placeholder="Alamat lengkap RT/RW, Kelurahan, Kecamatan"
-                value={formData.address || ''}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Catatan Kesiswaan */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-800 mb-1">Catatan Khusus Kesiswaan / OSIS</label>
-              <input
-                type="text"
-                placeholder="Contoh: Ketua OSIS, Jalur Beasiswa, Tahfidz"
-                value={formData.notes || ''}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+          {/* Class, Major, Gender */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Kelas *</label>
+              <input
+                type="text"
+                required
+                disabled={isReadOnly}
+                value={formData.class || ''}
+                onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                placeholder="Contoh: X IPA 1"
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Jurusan *</label>
+              <input
+                type="text"
+                required
+                disabled={isReadOnly}
+                value={formData.major || ''}
+                onChange={(e) => setFormData({ ...formData, major: e.target.value })}
+                placeholder="Contoh: IPA / IPS"
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Jenis Kelamin</label>
+              <select
+                disabled={isReadOnly}
+                value={formData.gender || 'L'}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'L' | 'P' })}
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              >
+                <option value="L">Laki-laki</option>
+                <option value="P">Perempuan</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Status & Violation Points */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status Siswa</label>
+              <select
+                disabled={isReadOnly}
+                value={formData.status || 'Aktif'}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              >
+                <option value="Aktif">Aktif</option>
+                <option value="Lulus">Lulus</option>
+                <option value="Pindah">Pindah</option>
+                <option value="Drop Out">Drop Out</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Poin Pelanggaran</label>
+              <input
+                type="number"
+                disabled={isReadOnly}
+                value={formData.violationPoints || 0}
+                onChange={(e) => setFormData({ ...formData, violationPoints: parseInt(e.target.value) || 0 })}
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              />
+            </div>
+          </div>
+
+          {/* Contact Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">No. HP Siswa</label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={formData.phone || ''}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="08xxxxxxxxxx"
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nama Orang Tua / Wali</label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={formData.parentName || ''}
+                onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                placeholder="Nama Orang Tua"
+                className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Alamat Lengkap</label>
+            <textarea
+              rows={2}
+              disabled={isReadOnly}
+              value={formData.address || ''}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Alamat domisili siswa..."
+              className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
             >
-              Batal
+              {isReadOnly ? 'Tutup' : 'Batal'}
             </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-blue-600/20 transition flex items-center space-x-2"
-            >
-              <Save className="w-4 h-4" />
-              <span>Simpan Data</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-md shadow-blue-600/20"
+              >
+                {mode === 'add' ? 'Simpan Siswa' : 'Perbarui Siswa'}
+              </button>
+            )}
           </div>
-
         </form>
-
       </div>
     </div>
   );
