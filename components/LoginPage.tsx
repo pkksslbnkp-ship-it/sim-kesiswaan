@@ -7,6 +7,36 @@ interface LoginPageProps {
   onLogin: (role: UserRole, userAccount?: UserAccount) => void;
 }
 
+const DEFAULT_USERS: UserAccount[] = [
+  {
+    id: '1',
+    name: 'Administrator Utama',
+    username: 'admin',
+    email: 'admin@sekolah.sch.id',
+    password: 'admin123password',
+    role: 'admin',
+    status: 'Aktif',
+  },
+  {
+    id: '2',
+    name: 'Tim Kesiswaan',
+    username: 'kesiswaan',
+    email: 'kesiswaan@sekolah.sch.id',
+    password: 'kesiswaan123password',
+    role: 'kesiswaan',
+    status: 'Aktif',
+  },
+  {
+    id: '3',
+    name: 'Wali Kelas X IPA 1',
+    username: 'walikelas10',
+    email: 'walikelas@sekolah.sch.id',
+    password: 'walikelas123password',
+    role: 'walikelas',
+    status: 'Aktif',
+  },
+];
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -16,15 +46,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setErrorMessage('');
 
-    // Ambil daftar pengguna dari localStorage
+    // Ambil dari localStorage, jika belum ada gunakan daftar default
     const savedUsers = localStorage.getItem('sim_users');
-    const usersList: UserAccount[] = savedUsers ? JSON.parse(savedUsers) : [];
+    const usersList: UserAccount[] = savedUsers ? JSON.parse(savedUsers) : DEFAULT_USERS;
 
-    // Cari pengguna yang cocok dengan username/email & password
+    // Jika belum ada sim_users di storage, inisialisasi dulu
+    if (!savedUsers) {
+      localStorage.setItem('sim_users', JSON.stringify(DEFAULT_USERS));
+    }
+
+    const cleanInput = usernameInput.toLowerCase().trim();
+
+    // Cari pengguna yang cocok
     const matchedUser = usersList.find(
       (u) =>
-        (u.username.toLowerCase() === usernameInput.toLowerCase().trim() ||
-          u.email.toLowerCase() === usernameInput.toLowerCase().trim()) &&
+        (u.username.toLowerCase() === cleanInput || u.email.toLowerCase() === cleanInput) &&
         (u.password ? u.password === passwordInput : true)
     );
 
@@ -33,25 +69,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setErrorMessage('Akun Anda saat ini dinonaktifkan oleh Administrator.');
         return;
       }
-      // Simpan user aktif
       localStorage.setItem('sim_active_user', JSON.stringify(matchedUser));
       onLogin(matchedUser.role, matchedUser);
     } else {
-      // Jika tidak ketemu di list khusus, perbolehkan login standar demo
-      if (usernameInput === 'admin' && passwordInput === 'admin123password') {
-        const adminUser: UserAccount = {
-          id: '1',
-          name: 'Administrator Utama',
-          username: 'admin',
-          email: 'admin@sekolah.sch.id',
-          role: 'admin',
-          status: 'Aktif',
-        };
-        localStorage.setItem('sim_active_user', JSON.stringify(adminUser));
-        onLogin('admin', adminUser);
-      } else {
-        setErrorMessage('Username atau Password salah! Silakan periksa kembali.');
-      }
+      setErrorMessage('Username/Email atau Password salah! Periksa kembali kredensial Anda.');
     }
   };
 
@@ -89,7 +110,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 required
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Masukkan username atau email"
+                placeholder="Contoh: admin / kesiswaan"
                 className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
               />
             </div>
@@ -119,6 +140,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             Masuk ke Aplikasi
           </button>
         </form>
+
+        <div className="mt-6 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-[11px] text-slate-500 space-y-1">
+          <p className="font-bold text-slate-700">Akun Bawaan Demo:</p>
+          <p>• Admin: <code className="text-blue-600 font-bold">admin</code> / <code className="text-blue-600 font-bold">admin123password</code></p>
+          <p>• Kesiswaan: <code className="text-blue-600 font-bold">kesiswaan</code> / <code className="text-blue-600 font-bold">kesiswaan123password</code></p>
+          <p>• Wali Kelas: <code className="text-blue-600 font-bold">walikelas10</code> / <code className="text-blue-600 font-bold">walikelas123password</code></p>
+        </div>
       </div>
     </div>
   );
