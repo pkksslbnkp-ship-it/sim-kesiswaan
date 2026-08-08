@@ -9,12 +9,18 @@ import {
   Trash2,
   CheckCircle,
   X,
+  Eye,
+  EyeOff,
+  Key,
+  AtSign,
 } from 'lucide-react';
 
 export interface UserAccount {
   id: string;
   name: string;
+  username: string;
   email: string;
+  password?: string;
   role: UserRole;
   status: 'Aktif' | 'Nonaktif';
   lastLogin?: string;
@@ -29,7 +35,9 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     {
       id: '1',
       name: 'Administrator Utama',
+      username: 'admin',
       email: 'admin@sekolah.sch.id',
+      password: 'admin123password',
       role: 'admin',
       status: 'Aktif',
       lastLogin: '2026-08-08 12:30',
@@ -37,7 +45,9 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     {
       id: '2',
       name: 'Tim Kesiswaan',
+      username: 'kesiswaan',
       email: 'kesiswaan@sekolah.sch.id',
+      password: 'kesiswaan123password',
       role: 'kesiswaan',
       status: 'Aktif',
       lastLogin: '2026-08-07 09:15',
@@ -45,7 +55,9 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     {
       id: '3',
       name: 'Wali Kelas X IPA 1',
+      username: 'walikelas10',
       email: 'walikelas@sekolah.sch.id',
+      password: 'walikelas123password',
       role: 'walikelas',
       status: 'Aktif',
       lastLogin: '2026-08-06 14:20',
@@ -55,10 +67,13 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
+    password: '',
     role: 'walikelas' as UserRole,
     status: 'Aktif' as 'Aktif' | 'Nonaktif',
   });
@@ -67,10 +82,13 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     setEditingUser(null);
     setFormData({
       name: '',
+      username: '',
       email: '',
+      password: '',
       role: 'walikelas',
       status: 'Aktif',
     });
+    setShowPassword(false);
     setIsModalOpen(true);
   };
 
@@ -78,10 +96,13 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     setEditingUser(user);
     setFormData({
       name: user.name,
+      username: user.username || '',
       email: user.email,
+      password: '', // Dikosongkan agar jika tidak diisi, password lama tidak berubah
       role: user.role,
       status: user.status,
     });
+    setShowPassword(false);
     setIsModalOpen(true);
   };
 
@@ -95,14 +116,31 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     e.preventDefault();
     if (editingUser) {
       setUsers(
-        users.map((u) =>
-          u.id === editingUser.id ? { ...u, ...formData } : u
-        )
+        users.map((u) => {
+          if (u.id === editingUser.id) {
+            return {
+              ...u,
+              name: formData.name,
+              username: formData.username,
+              email: formData.email,
+              role: formData.role,
+              status: formData.status,
+              // Update password hanya jika diisi oleh admin
+              password: formData.password ? formData.password : u.password,
+            };
+          }
+          return u;
+        })
       );
     } else {
       const newUser: UserAccount = {
         id: Date.now().toString(),
-        ...formData,
+        name: formData.name,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        status: formData.status,
         lastLogin: 'Belum pernah',
       };
       setUsers([...users, newUser]);
@@ -113,6 +151,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -124,7 +163,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Manajemen Pengguna</h2>
           <p className="text-xs font-semibold text-slate-500 mt-1">
-            Kelola hak akses akun Admin, Kesiswaan, Wali Kelas, dan Pengguna Sistem.
+            Kelola akun, username, password, dan hak akses Admin, Kesiswaan, serta Wali Kelas.
           </p>
         </div>
         <button
@@ -142,7 +181,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
           <input
             type="text"
-            placeholder="Cari Berdasarkan Nama, Email, atau Peran..."
+            placeholder="Cari Berdasarkan Nama, Username, Email, atau Peran..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -157,6 +196,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="px-4 py-3.5">Pengguna</th>
+                <th className="px-4 py-3.5">Username & Email</th>
                 <th className="px-4 py-3.5">Peran / Hak Akses</th>
                 <th className="px-4 py-3.5 text-center">Status</th>
                 <th className="px-4 py-3.5">Login Terakhir</th>
@@ -172,10 +212,16 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
                           {user.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="font-bold text-slate-900">{user.name}</div>
-                          <div className="text-[10px] text-slate-400">{user.email}</div>
+                        <div className="font-bold text-slate-900">{user.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-blue-600 flex items-center space-x-1">
+                          <AtSign className="w-3 h-3" />
+                          <span>{user.username}</span>
                         </div>
+                        <div className="text-[10px] text-slate-400">{user.email}</div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
@@ -203,7 +249,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                         <button
                           onClick={() => handleOpenEdit(user)}
                           className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                          title="Edit Pengguna"
+                          title="Edit Pengguna & Password"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -220,7 +266,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-slate-400">
+                  <td colSpan={6} className="text-center py-8 text-slate-400">
                     Tidak ada pengguna ditemukan.
                   </td>
                 </tr>
@@ -233,7 +279,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
       {/* Modal Add / Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
@@ -250,7 +296,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                   {editingUser ? 'Edit Akun Pengguna' : 'Tambah Akun Pengguna'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  Isi data kredensial dan hak akses pengguna
+                  Atur kredensial login (Username & Password) serta hak akses pengguna
                 </p>
               </div>
             </div>
@@ -263,24 +309,69 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Masukkan nama pengguna..."
+                  placeholder="Contoh: Drs. Ahmad Dahlan"
                   className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Username *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().trim() })}
+                    placeholder="Contoh: ahmad_walikelas"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-blue-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="ahmad@sekolah.sch.id"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Email / Username *</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="pengguna@sekolah.sch.id"
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center space-x-1">
+                    <Key className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Password {editingUser ? '(Opsional)' : '*'}</span>
+                  </span>
+                  {editingUser && (
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      Kosongkan jika tidak ubah password
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={!editingUser}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder={editingUser ? '•••••••• (Tetap password lama)' : 'Masukkan password baru'}
+                    className="w-full pl-3.5 pr-10 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Hak Akses (Role)</label>
                   <select
