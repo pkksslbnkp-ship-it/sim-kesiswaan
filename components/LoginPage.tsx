@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { UserRole } from '../types';
-import { Shield, Lock, User, AlertCircle } from 'lucide-react';
+import { Lock, User, AlertCircle } from 'lucide-react';
 import { UserAccount } from './UserManagement';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole, userAccount?: UserAccount) => void;
+  onLogin: (role: UserRole, userAccount: UserAccount) => void;
 }
 
 const DEFAULT_USERS: UserAccount[] = [
@@ -46,33 +46,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setErrorMessage('');
 
-    // Ambil dari localStorage, jika belum ada gunakan daftar default
+    // Ambil daftar user dari localStorage atau fallback ke DEFAULT_USERS
     const savedUsers = localStorage.getItem('sim_users');
     const usersList: UserAccount[] = savedUsers ? JSON.parse(savedUsers) : DEFAULT_USERS;
 
-    // Jika belum ada sim_users di storage, inisialisasi dulu
-    if (!savedUsers) {
-      localStorage.setItem('sim_users', JSON.stringify(DEFAULT_USERS));
-    }
+    const inputClean = usernameInput.toLowerCase().trim();
 
-    const cleanInput = usernameInput.toLowerCase().trim();
-
-    // Cari pengguna yang cocok
+    // Cari user berdasarkan username/email AND password
     const matchedUser = usersList.find(
       (u) =>
-        (u.username.toLowerCase() === cleanInput || u.email.toLowerCase() === cleanInput) &&
-        (u.password ? u.password === passwordInput : true)
+        (u.username.toLowerCase() === inputClean || u.email.toLowerCase() === inputClean) &&
+        (u.password ? u.password === passwordInput : passwordInput === '123456')
     );
 
     if (matchedUser) {
       if (matchedUser.status === 'Nonaktif') {
-        setErrorMessage('Akun Anda saat ini dinonaktifkan oleh Administrator.');
+        setErrorMessage('Akun ini sedang dinonaktifkan oleh Administrator.');
         return;
       }
       localStorage.setItem('sim_active_user', JSON.stringify(matchedUser));
       onLogin(matchedUser.role, matchedUser);
     } else {
-      setErrorMessage('Username/Email atau Password salah! Periksa kembali kredensial Anda.');
+      setErrorMessage('Username/Email atau Password salah!');
     }
   };
 
@@ -87,7 +82,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             SIM KESISWAAN
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Masukkan Username dan Password akun Anda
+            Masukkan Username dan Password Anda
           </p>
         </div>
 
@@ -101,7 +96,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              Username atau Email
+              Username / Email
             </label>
             <div className="relative">
               <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -110,8 +105,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 required
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Contoh: admin / kesiswaan"
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                placeholder="Username atau Email"
+                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-800"
               />
             </div>
           </div>
@@ -128,7 +123,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
               />
             </div>
           </div>
@@ -140,13 +135,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             Masuk ke Aplikasi
           </button>
         </form>
-
-        <div className="mt-6 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-[11px] text-slate-500 space-y-1">
-          <p className="font-bold text-slate-700">Akun Bawaan Demo:</p>
-          <p>• Admin: <code className="text-blue-600 font-bold">admin</code> / <code className="text-blue-600 font-bold">admin123password</code></p>
-          <p>• Kesiswaan: <code className="text-blue-600 font-bold">kesiswaan</code> / <code className="text-blue-600 font-bold">kesiswaan123password</code></p>
-          <p>• Wali Kelas: <code className="text-blue-600 font-bold">walikelas10</code> / <code className="text-blue-600 font-bold">walikelas123password</code></p>
-        </div>
       </div>
     </div>
   );
