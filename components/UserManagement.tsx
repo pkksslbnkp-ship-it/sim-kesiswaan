@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole } from '../types';
 import {
   Users,
@@ -26,43 +26,44 @@ export interface UserAccount {
   lastLogin?: string;
 }
 
-interface UserManagementProps {
-  currentUserRole?: UserRole;
-}
+const DEFAULT_USERS: UserAccount[] = [
+  {
+    id: '1',
+    name: 'Administrator Utama',
+    username: 'admin',
+    email: 'admin@sekolah.sch.id',
+    password: 'admin123password',
+    role: 'admin',
+    status: 'Aktif',
+    lastLogin: '2026-08-08 12:30',
+  },
+  {
+    id: '2',
+    name: 'Tim Kesiswaan',
+    username: 'kesiswaan',
+    email: 'kesiswaan@sekolah.sch.id',
+    password: 'kesiswaan123password',
+    role: 'kesiswaan',
+    status: 'Aktif',
+    lastLogin: '2026-08-07 09:15',
+  },
+  {
+    id: '3',
+    name: 'Wali Kelas X IPA 1',
+    username: 'walikelas10',
+    email: 'walikelas@sekolah.sch.id',
+    password: 'walikelas123password',
+    role: 'walikelas',
+    status: 'Aktif',
+    lastLogin: '2026-08-06 14:20',
+  },
+];
 
-export const UserManagement: React.FC<UserManagementProps> = () => {
-  const [users, setUsers] = useState<UserAccount[]>([
-    {
-      id: '1',
-      name: 'Administrator Utama',
-      username: 'admin',
-      email: 'admin@sekolah.sch.id',
-      password: 'admin123password',
-      role: 'admin',
-      status: 'Aktif',
-      lastLogin: '2026-08-08 12:30',
-    },
-    {
-      id: '2',
-      name: 'Tim Kesiswaan',
-      username: 'kesiswaan',
-      email: 'kesiswaan@sekolah.sch.id',
-      password: 'kesiswaan123password',
-      role: 'kesiswaan',
-      status: 'Aktif',
-      lastLogin: '2026-08-07 09:15',
-    },
-    {
-      id: '3',
-      name: 'Wali Kelas X IPA 1',
-      username: 'walikelas10',
-      email: 'walikelas@sekolah.sch.id',
-      password: 'walikelas123password',
-      role: 'walikelas',
-      status: 'Aktif',
-      lastLogin: '2026-08-06 14:20',
-    },
-  ]);
+export const UserManagement: React.FC = () => {
+  const [users, setUsers] = useState<UserAccount[]>(() => {
+    const saved = localStorage.getItem('sim_users');
+    return saved ? JSON.parse(saved) : DEFAULT_USERS;
+  });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +78,11 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
     role: 'walikelas' as UserRole,
     status: 'Aktif' as 'Aktif' | 'Nonaktif',
   });
+
+  // Simpan setiap kali ada perubahan users
+  useEffect(() => {
+    localStorage.setItem('sim_users', JSON.stringify(users));
+  }, [users]);
 
   const handleOpenAdd = () => {
     setEditingUser(null);
@@ -98,7 +104,7 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
       name: user.name,
       username: user.username || '',
       email: user.email,
-      password: '', // Dikosongkan agar jika tidak diisi, password lama tidak berubah
+      password: '',
       role: user.role,
       status: user.status,
     });
@@ -108,37 +114,36 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
 
   const handleDelete = (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus akun pengguna ini?')) {
-      setUsers(users.filter((u) => u.id !== id));
+      const updated = users.filter((u) => u.id !== id);
+      setUsers(updated);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser) {
-      setUsers(
-        users.map((u) => {
-          if (u.id === editingUser.id) {
-            return {
-              ...u,
-              name: formData.name,
-              username: formData.username,
-              email: formData.email,
-              role: formData.role,
-              status: formData.status,
-              // Update password hanya jika diisi oleh admin
-              password: formData.password ? formData.password : u.password,
-            };
-          }
-          return u;
-        })
-      );
+      const updated = users.map((u) => {
+        if (u.id === editingUser.id) {
+          return {
+            ...u,
+            name: formData.name,
+            username: formData.username,
+            email: formData.email,
+            role: formData.role,
+            status: formData.status,
+            password: formData.password ? formData.password : u.password,
+          };
+        }
+        return u;
+      });
+      setUsers(updated);
     } else {
       const newUser: UserAccount = {
         id: Date.now().toString(),
         name: formData.name,
         username: formData.username,
         email: formData.email,
-        password: formData.password,
+        password: formData.password || '123456',
         role: formData.role,
         status: formData.status,
         lastLogin: 'Belum pernah',
@@ -321,7 +326,9 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                     type="text"
                     required
                     value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().trim() })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, username: e.target.value.toLowerCase().trim() })
+                    }
                     placeholder="Contoh: ahmad_walikelas"
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-blue-700"
                   />
@@ -358,7 +365,9 @@ export const UserManagement: React.FC<UserManagementProps> = () => {
                     required={!editingUser}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={editingUser ? '•••••••• (Tetap password lama)' : 'Masukkan password baru'}
+                    placeholder={
+                      editingUser ? '•••••••• (Tetap password lama)' : 'Masukkan password baru'
+                    }
                     className="w-full pl-3.5 pr-10 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                   <button
