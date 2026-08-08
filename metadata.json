@@ -1,0 +1,6 @@
+{
+  "name": "SIM Kesiswaan - Sistem Manajemen Kesiswaan",
+  "description": "Sistem Informasi Manajemen Kesiswaan terpadu untuk Waka Kesiswaan dan Guru: Olah Data Siswa, Import Excel, Prestasi, Alumni, dan Analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
