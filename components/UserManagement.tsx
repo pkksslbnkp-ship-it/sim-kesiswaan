@@ -1,298 +1,335 @@
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
-import { UserCog, Shield, UserCheck, Plus, Check, X, Key, Mail, Lock, Trash2 } from 'lucide-react';
+import { UserRole } from '../types';
+import {
+  Users,
+  UserPlus,
+  Search,
+  Shield,
+  Edit3,
+  Trash2,
+  CheckCircle,
+  X,
+} from 'lucide-react';
 
-interface UserManagementProps {
-  users: User[];
-  currentUser: User;
-  onAddUser: (newUser: Omit<User, 'id' | 'createdAt'>) => void;
-  onToggleUserStatus: (userId: string) => void;
-  onDeleteUser?: (userId: string) => void;
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: 'Aktif' | 'Nonaktif';
+  lastLogin?: string;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({
-  users,
-  currentUser,
-  onAddUser,
-  onToggleUserStatus,
-  onDeleteUser,
-}) => {
+interface UserManagementProps {
+  currentUserRole?: UserRole;
+}
+
+export const UserManagement: React.FC<UserManagementProps> = () => {
+  const [users, setUsers] = useState<UserAccount[]>([
+    {
+      id: '1',
+      name: 'Administrator Utama',
+      email: 'admin@sekolah.sch.id',
+      role: 'admin',
+      status: 'Aktif',
+      lastLogin: '2026-08-08 12:30',
+    },
+    {
+      id: '2',
+      name: 'Tim Kesiswaan',
+      email: 'kesiswaan@sekolah.sch.id',
+      role: 'kesiswaan',
+      status: 'Aktif',
+      lastLogin: '2026-08-07 09:15',
+    },
+    {
+      id: '3',
+      name: 'Wali Kelas X IPA 1',
+      email: 'walikelas@sekolah.sch.id',
+      role: 'walikelas',
+      status: 'Aktif',
+      lastLogin: '2026-08-06 14:20',
+    },
+  ]);
+
+  const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    nip: '',
-    role: 'guru' as UserRole,
+    role: 'walikelas' as UserRole,
+    status: 'Aktif' as 'Aktif' | 'Nonaktif',
   });
+
+  const handleOpenAdd = () => {
+    setEditingUser(null);
+    setFormData({
+      name: '',
+      email: '',
+      role: 'walikelas',
+      status: 'Aktif',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (user: UserAccount) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus akun pengguna ini?')) {
+      setUsers(users.filter((u) => u.id !== id));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) {
-      alert('Nama dan Email Pengguna wajib diisi!');
-      return;
+    if (editingUser) {
+      setUsers(
+        users.map((u) =>
+          u.id === editingUser.id ? { ...u, ...formData } : u
+        )
+      );
+    } else {
+      const newUser: UserAccount = {
+        id: Date.now().toString(),
+        ...formData,
+        lastLogin: 'Belum pernah',
+      };
+      setUsers([...users, newUser]);
     }
-
-    onAddUser({
-      name: formData.name,
-      email: formData.email,
-      nip: formData.nip,
-      role: formData.role,
-      status: 'aktif',
-    });
-
     setIsModalOpen(false);
-    setFormData({ name: '', email: '', nip: '', role: 'guru' });
   };
+
+  const filteredUsers = users.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
-      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100">
-              <UserCog className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Manajemen Pengguna & Matriks Hak Akses (RBAC)</h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Pengelolaan akun Waka Kesiswaan (Admin) dan Guru (User) serta pembatasan kewenangan.
-              </p>
-            </div>
-          </div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Manajemen Pengguna</h2>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Kelola hak akses akun Admin, Kesiswaan, Wali Kelas, dan Pengguna Sistem.
+          </p>
         </div>
-
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-purple-600/20 transition flex items-center space-x-2"
+          onClick={handleOpenAdd}
+          className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/20"
         >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Akun Guru / Staff</span>
+          <UserPlus className="w-4 h-4" />
+          <span>Tambah Pengguna</span>
         </button>
       </div>
 
-      {/* Permission Matrix Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-        <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
-          <Shield className="w-5 h-5 text-amber-600" />
-          <span>Matriks Kewenangan Role-Based Access Control (RBAC)</span>
-        </h3>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">Fitur / Fitur Aplikasi</th>
-                <th className="p-3.5 text-center text-amber-800 font-black">Admin (Waka Kesiswaan)</th>
-                <th className="p-3.5 text-center text-emerald-800 font-black">User (Guru/Staff)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr>
-                <td className="p-3.5 font-bold text-slate-900">Melihat & Mencari Data Siswa, Alumni, Prestasi</td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-              </tr>
-              <tr>
-                <td className="p-3.5 font-bold text-slate-900">Tambah, Edit, Hapus (CRUD) Data Siswa</td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-              </tr>
-              <tr>
-                <td className="p-3.5 font-bold text-slate-900">Upload & Parsing Excel (.xlsx/.csv) Siswa</td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-              </tr>
-              <tr>
-                <td className="p-3.5 font-bold text-slate-900">Meluluskan Siswa ke Data Alumni</td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-              </tr>
-              <tr>
-                <td className="p-3.5 font-bold text-slate-900">Kelola Akun Pengguna & Hak Akses</td>
-                <td className="p-3.5 text-center"><Check className="w-5 h-5 text-emerald-600 mx-auto stroke-[3]" /></td>
-                <td className="p-3.5 text-center"><X className="w-5 h-5 text-rose-500 mx-auto stroke-[3]" /></td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Filter & Search */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="relative max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+          <input
+            type="text"
+            placeholder="Cari Berdasarkan Nama, Email, atau Peran..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
-      {/* Users List */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-          <h3 className="text-base font-black text-slate-900">Daftar Akun Terdaftar ({users.length})</h3>
-        </div>
-
+      {/* User Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
               <tr>
-                <th className="p-3.5">Nama & NIP</th>
-                <th className="p-3.5">Username / Email</th>
-                <th className="p-3.5">Password</th>
-                <th className="p-3.5">Role System</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-center">Aksi Admin</th>
+                <th className="px-4 py-3.5">Pengguna</th>
+                <th className="px-4 py-3.5">Peran / Hak Akses</th>
+                <th className="px-4 py-3.5 text-center">Status</th>
+                <th className="px-4 py-3.5">Login Terakhir</th>
+                <th className="px-4 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 transition">
-                  <td className="p-3.5">
-                    <div className="font-bold text-slate-900">{u.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">NIP: {u.nip || '-'}</div>
-                  </td>
-
-                  <td className="p-3.5">
-                    <div className="font-bold text-slate-800">{u.username || u.email.split('@')[0]}</div>
-                    <div className="text-[10px] text-slate-400">{u.email}</div>
-                  </td>
-
-                  <td className="p-3.5">
-                    <code className="px-2 py-1 rounded bg-slate-100 font-mono text-[11px] font-bold text-blue-700 border border-slate-200">
-                      {u.password || (u.role === 'admin' ? 'admin123' : 'guru123')}
-                    </code>
-                  </td>
-
-                  <td className="p-3.5">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      u.role === 'admin'
-                        ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                        : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-                    }`}>
-                      {u.role === 'admin' ? 'Admin (Waka Kesiswaan)' : 'User (Guru)'}
-                    </span>
-                  </td>
-
-                  <td className="p-3.5">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                      u.status === 'aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {u.status}
-                    </span>
-                  </td>
-
-                  <td className="p-3.5 text-center">
-                    {u.id !== currentUser.id ? (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => onToggleUserStatus(u.id)}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold border border-slate-200 transition shadow-sm"
-                          title={u.status === 'aktif' ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}
-                        >
-                          {u.status === 'aktif' ? 'Nonaktifkan' : 'Aktifkan'}
-                        </button>
-
-                        {onDeleteUser && (
-                          <button
-                            onClick={() => onDeleteUser(u.id)}
-                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 transition shadow-sm flex items-center space-x-1"
-                            title="Hapus Akun Pengguna"
-                          >
-                            <Trash2 className="w-3 h-3 text-rose-600" />
-                            <span>Hapus</span>
-                          </button>
-                        )}
+            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-slate-50 transition">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900">{user.name}</div>
+                          <div className="text-[10px] text-slate-400">{user.email}</div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-semibold italic">(Akun Anda)</span>
-                    )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                        <Shield className="w-3 h-3 text-blue-600" />
+                        <span>{user.role}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          user.status === 'Aktif'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {user.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500 font-medium text-[11px]">
+                      {user.lastLogin}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => handleOpenEdit(user)}
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                          title="Edit Pengguna"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          title="Hapus Pengguna"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-slate-400">
+                    Tidak ada pengguna ditemukan.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add User Modal */}
+      {/* Modal Add / Edit */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 text-slate-900 space-y-4">
-            
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="text-lg font-black text-slate-900 flex items-center space-x-2">
-                <UserCog className="w-5 h-5 text-purple-600" />
-                <span>Tambah Akun Pengguna</span>
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
-                <X className="w-5 h-5" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  {editingUser ? 'Edit Akun Pengguna' : 'Tambah Akun Pengguna'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Isi data kredensial dan hak akses pengguna
+                </p>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-800 mb-1">Nama Lengkap & Gelar *</label>
+                <label className="block font-bold text-slate-700 mb-1">Nama Lengkap *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Dra. Endang Sri, M.Pd."
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Masukkan nama pengguna..."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-800 mb-1">NIP Pegawai</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: 198501012010012003"
-                  value={formData.nip}
-                  onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Email Sekolah *</label>
+                <label className="block font-bold text-slate-700 mb-1">Email / Username *</label>
                 <input
                   type="email"
                   required
-                  placeholder="nama.guru@sekolah.sch.id"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="pengguna@sekolah.sch.id"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Role & Hak Akses</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="guru">Guru (User - Read Only Data Siswa & Prestasi)</option>
-                  <option value="admin">Waka Kesiswaan (Admin - Full CRUD & Import Excel)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Hak Akses (Role)</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="kesiswaan">Kesiswaan</option>
+                    <option value="walikelas">Wali Kelas</option>
+                    <option value="pembina">Pembina</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Status Akun</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value as 'Aktif' | 'Nonaktif' })
+                    }
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="Aktif">Aktif</option>
+                    <option value="Nonaktif">Nonaktif</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+              <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100 mt-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-wider shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-md shadow-blue-600/20 flex items-center space-x-1.5"
                 >
-                  Buat Akun
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Simpan</span>
                 </button>
               </div>
-
             </form>
-
           </div>
         </div>
       )}
-
     </div>
   );
 };
