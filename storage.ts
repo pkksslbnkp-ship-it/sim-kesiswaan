@@ -1,5 +1,5 @@
 import { Student, User, Achievement, Alumni, ActivityLog, UserRole } from '../types';
-import { INITIAL_STUDENTS, INITIAL_USERS, INITIAL_ACHIEVEMENTS, INITIAL_ALUMNI, INITIAL_LOGS } from '../data/mockData';
+import { INITIAL_STUDENTS, INITIAL_USERS, INITIAL_ACHIEVEMENTS, INITIAL_ALUMNI, INITIAL_LOGS } from '../mockData';
 
 const KEYS = {
   STUDENTS: 'sim_kesiswaan_students_v1',
