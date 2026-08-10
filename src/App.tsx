@@ -1,262 +1,449 @@
 import React, { useState, useEffect } from 'react';
+import { User, Student, Achievement, Alumni, ActivityLog } from './types';
+import { 
+  getStoredStudents, setStoredStudents, 
+  getStoredUsers, setStoredUsers, 
+  getStoredAchievements, setStoredAchievements, 
+  getStoredAlumni, setStoredAlumni, 
+  getStoredLogs, addActivityLog, 
+  getCurrentUser, setCurrentUser, 
+  resetDataToDefault 
+} from './lib/storage';
+
 import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
-import { LoginPage, UserAccount } from './components/LoginPage';
-import { UserManagement } from './components/UserManagement';
+import { Sidebar, TabType } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
-import { X, Upload, Info, Database } from 'lucide-react';
+import { StudentList } from './components/StudentList';
+import { StudentModal } from './components/StudentModal';
+import { StudentDetailModal } from './components/StudentDetailModal';
+import { ExcelUpload } from './components/ExcelUpload';
+import { AchievementList } from './components/AchievementList';
+import { AlumniList } from './components/AlumniList';
+import { UserManagement } from './components/UserManagement';
+import { TechnicalDoc } from './components/TechnicalDoc';
+import { LoginPage } from './components/LoginPage';
+import { SchoolLogoModal } from './components/SchoolLogoModal';
+import { SupabaseModal } from './components/SupabaseModal';
+import { ConfirmModal } from './components/ConfirmModal';
 
-// Data Utama Sistem (Sesuai Tabel Kamu)
-const DEFAULT_USERS: UserAccount[] = [
-  {
-    id: '1',
-    name: 'Administrator Utama',
-    username: 'admin',
-    email: 'admin@sekolah.sch.id',
-    role: 'Admin (Waka Kesiswaan)',
-    status: 'Aktif',
-    password: 'admin123',
-    lastLogin: '2026-08-08 12:30',
-  },
-  {
-    id: '2',
-    name: 'Tim Kesiswaan',
-    username: 'kesiswaan',
-    email: 'kesiswaan@sekolah.sch.id',
-    role: 'Guru (User)',
-    status: 'Aktif',
-    password: 'guru123',
-    lastLogin: '2026-08-07 09:15',
-  },
-  {
-    id: '3',
-    name: 'Wali Kelas X IPA 1',
-    username: 'walikelas10',
-    email: 'walikelas@sekolah.sch.id',
-    role: 'Guru (User)',
-    status: 'Aktif',
-    password: 'guru123',
-    lastLogin: '2026-08-06 14:20',
-  },
-];
-
-export function App() {
-  // Ambil dari LocalStorage atau pakai DEFAULT_USERS
-  const [users, setUsers] = useState<UserAccount[]>(() => {
-    const saved = localStorage.getItem('sim_users');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return DEFAULT_USERS;
-  });
-
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    const saved = localStorage.getItem('sim_active_user');
-    return saved ? JSON.parse(saved) : users[0] || DEFAULT_USERS[0];
-  });
+export default function App() {
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
   const [schoolLogo, setSchoolLogo] = useState<string | null>(() => {
-    return localStorage.getItem('sim_school_logo') || null;
+    try {
+      return localStorage.getItem('sim_kesiswaan_school_logo');
+    } catch {
+      return null;
+    }
   });
 
-  const [activeTab, setActiveTab] = useState<string>('usermanagement');
-  const [showLogoModal, setShowLogoModal] = useState(false);
-  const [showDocModal, setShowDocModal] = useState(false);
-  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
-  // Otomatis Simpan ke LocalStorage Setiap Ada Tambah/Edit/Hapus
-  useEffect(() => {
-    localStorage.setItem('sim_users', JSON.stringify(users));
-  }, [users]);
-
-  // Fungsi Tambah/Edit Pengguna Terpusat
-  const handleSaveUser = (userToSave: UserAccount) => {
-    setUsers((prevUsers) => {
-      const index = prevUsers.findIndex((u) => u.id === userToSave.id);
-      let updated: UserAccount[];
-      if (index >= 0) {
-        updated = [...prevUsers];
-        updated[index] = userToSave;
-      } else {
-        updated = [...prevUsers, userToSave];
-      }
-      localStorage.setItem('sim_users', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  // Fungsi Hapus Pengguna
-  const handleDeleteUser = (id: string) => {
-    setUsers((prevUsers) => {
-      const updated = prevUsers.filter((u) => u.id !== id);
-      localStorage.setItem('sim_users', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleLogin = (role: any, userAccount?: UserAccount) => {
-    if (userAccount) {
-      setCurrentUser(userAccount);
-      localStorage.setItem('sim_active_user', JSON.stringify(userAccount));
+  // Status Login
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    try {
+      const auth = localStorage.getItem('sim_kesiswaan_is_logged_in_v1');
+      return auth ? JSON.parse(auth) : false;
+    } catch {
+      return false;
     }
+  });
+
+  // State Utama
+  const [currentUser, setCurrentUserRule] = useState<User>(getCurrentUser());
+  const [users, setUsers] = useState<User[]>(getStoredUsers());
+  const [students, setStudents] = useState<Student[]>(getStoredStudents());
+  const [achievements, setAchievements] = useState<Achievement[]>(getStoredAchievements());
+  const [alumni, setAlumni] = useState<Alumni[]>(getStoredAlumni());
+  const [logs, setLogs] = useState<ActivityLog[]>(getStoredLogs());
+
+  // Modal State
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<Student | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const askConfirmation = (config: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }) => {
+    setConfirmModal({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      confirmText: config.confirmText,
+      variant: config.variant || 'danger',
+      onConfirm: () => {
+        config.onConfirm();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  useEffect(() => { setStoredStudents(students); }, [students]);
+  useEffect(() => { setStoredUsers(users); }, [users]);
+  useEffect(() => { setStoredAchievements(achievements); }, [achievements]);
+  useEffect(() => { setStoredAlumni(alumni); }, [alumni]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sim_kesiswaan_is_logged_in_v1', JSON.stringify(isLoggedIn));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isLoggedIn]);
+
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUserRule(user);
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    addActivityLog(user.name, user.role, 'LOGIN', `Berhasil login sebagai ${user.name}`);
+    setLogs(getStoredLogs());
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('sim_active_user');
+    addActivityLog(currentUser.name, currentUser.role, 'LOGOUT', `Pengguna ${currentUser.name} keluar dari sistem`);
+    setIsLoggedIn(false);
+    localStorage.setItem('sim_kesiswaan_is_logged_in_v1', 'false');
+    setLogs(getStoredLogs());
   };
 
-  const handleSwitchUser = (selectedUser: UserAccount) => {
-    setCurrentUser(selectedUser);
-    localStorage.setItem('sim_active_user', JSON.stringify(selectedUser));
+  const handleSwitchUser = (user: User) => {
+    setCurrentUserRule(user);
+    setCurrentUser(user);
+    addActivityLog(user.name, user.role, 'SWITCH_USER', `Beralih peran sebagai ${user.name}`);
+    setLogs(getStoredLogs());
   };
 
   const handleResetData = () => {
-    if (window.confirm('Reset daftar pengguna kembali ke data awal?')) {
-      localStorage.removeItem('sim_users');
-      setUsers(DEFAULT_USERS);
-      setCurrentUser(DEFAULT_USERS[0]);
-      localStorage.setItem('sim_users', JSON.stringify(DEFAULT_USERS));
-      localStorage.setItem('sim_active_user', JSON.stringify(DEFAULT_USERS[0]));
-      alert('Data pengguna berhasil disinkronkan!');
-    }
+    askConfirmation({
+      title: 'Reset Data Demo',
+      message: 'Apakah Anda yakin ingin mereset seluruh data kembali ke set awal demo?',
+      confirmText: 'Reset Sekarang',
+      variant: 'warning',
+      onConfirm: () => {
+        resetDataToDefault();
+        setStudents(getStoredStudents());
+        setUsers(getStoredUsers());
+        setAchievements(getStoredAchievements());
+        setAlumni(getStoredAlumni());
+        setCurrentUserRule(getCurrentUser());
+        setLogs(getStoredLogs());
+      },
+    });
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSchoolLogo(reader.result as string);
-        localStorage.setItem('sim_school_logo', reader.result as string);
-        setShowLogoModal(false);
+  const handleSaveStudent = (data: Partial<Student>) => {
+    if (editingStudent) {
+      const updated = students.map((s) => (s.id === editingStudent.id ? ({ ...s, ...data } as Student) : s));
+      setStudents(updated);
+      addActivityLog(currentUser.name, currentUser.role, 'UPDATE_STUDENT', `Memperbarui data siswa: ${data.name}`);
+    } else {
+      const newStudent: Student = {
+        id: `std-${Date.now()}`,
+        nisn: data.nisn || `00${Date.now()}`,
+        nis: data.nis || `${23241000 + students.length}`,
+        name: data.name || 'Siswa Baru',
+        gender: data.gender || 'L',
+        class: data.class || '10 MIPA 1',
+        major: data.major || 'MIPA',
+        generation: data.generation || '2025/2026',
+        entryYear: data.entryYear || 2025,
+        status: data.status || 'Aktif',
+        birthPlace: data.birthPlace || '',
+        birthDate: data.birthDate || '',
+        address: data.address || '',
+        phone: data.phone || '',
+        parentName: data.parentName || '',
+        parentPhone: data.parentPhone || '',
+        notes: data.notes || '',
+        createdAt: new Date().toISOString(),
       };
-      reader.readAsDataURL(file);
+      setStudents([newStudent, ...students]);
+      addActivityLog(currentUser.name, currentUser.role, 'ADD_STUDENT', `Menambahkan siswa baru: ${newStudent.name}`);
     }
+    setEditingStudent(null);
+    setLogs(getStoredLogs());
   };
 
-  if (!currentUser) {
-    return <LoginPage users={users} onLogin={handleLogin} schoolLogo={schoolLogo} />;
+  const handleDeleteStudent = (id: string) => {
+    const target = students.find((s) => s.id === id);
+    const targetName = target ? target.name : 'Siswa';
+    askConfirmation({
+      title: 'Hapus Data Siswa',
+      message: `Apakah Anda yakin ingin menghapus data siswa "${targetName}"?`,
+      confirmText: 'Hapus Siswa',
+      variant: 'danger',
+      onConfirm: () => {
+        setStudents((prev) => prev.filter((s) => s.id !== id));
+        addActivityLog(currentUser.name, currentUser.role, 'DELETE_STUDENT', `Menghapus data siswa: ${targetName}`);
+        setLogs(getStoredLogs());
+      },
+    });
+  };
+
+  const handleGraduateStudent = (student: Student) => {
+    askConfirmation({
+      title: 'Luluskan Siswa ke Alumni',
+      message: `Ubah status "${student.name}" menjadi Lulus dan tambahkan data ini ke Rekap Alumni?`,
+      confirmText: 'Luluskan Siswa',
+      variant: 'info',
+      onConfirm: () => {
+        const updatedStudents = students.map((s) =>
+          s.id === student.id ? { ...s, status: 'Lulus' as const } : s
+        );
+        setStudents(updatedStudents);
+
+        const newAlumniRecord: Alumni = {
+          id: `alm-${Date.now()}`,
+          studentId: student.id,
+          nisn: student.nisn,
+          name: student.name,
+          graduationYear: new Date().getFullYear(),
+          major: student.major,
+          currentStatus: 'Kuliah',
+          institutionName: 'Perguruan Tinggi',
+          positionOrMajor: student.major,
+          phone: student.phone || '08123456789',
+          address: student.address || '-',
+          notes: 'Dialihkan dari Data Siswa Aktif',
+          updatedAt: new Date().toISOString(),
+        };
+        setAlumni((prev) => [newAlumniRecord, ...prev]);
+        addActivityLog(currentUser.name, currentUser.role, 'GRADUATE_STUDENT', `Meluluskan siswa "${student.name}"`);
+        setLogs(getStoredLogs());
+      },
+    });
+  };
+
+  // Handler Edit Pengguna (Menghubungkan Edit ke State Users & State Active Profile)
+  const handleEditUser = (updatedUser: User) => {
+    const updatedUsers = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
+    setUsers(updatedUsers);
+
+    if (currentUser.id === updatedUser.id) {
+      setCurrentUserRule(updatedUser);
+      setCurrentUser(updatedUser);
+    }
+
+    addActivityLog(currentUser.name, currentUser.role, 'UPDATE_USER', `Memperbarui data pengguna: ${updatedUser.name}`);
+    setLogs(getStoredLogs());
+  };
+
+  // JIKA BELUM LOGIN -> TAMPILKAN LOGIN PAGE
+  if (!isLoggedIn) {
+    return (
+      <LoginPage
+        allUsers={users}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
   }
 
+  // JIKA SUDAH LOGIN -> TAMPILKAN APLIKASI DENGAN SIDEBAR
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-800 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      
+      {/* Top Header */}
       <Header
         currentUser={currentUser}
         allUsers={users}
         schoolLogo={schoolLogo}
         onSwitchUser={handleSwitchUser}
         onResetData={handleResetData}
-        onOpenDoc={() => setShowDocModal(true)}
+        onOpenDoc={() => setActiveTab('technical-doc')}
         onLogout={handleLogout}
-        onOpenSchoolLogoModal={() => setShowLogoModal(true)}
-        onOpenSupabaseModal={() => setShowSupabaseModal(true)}
+        onOpenSchoolLogoModal={() => setIsLogoModalOpen(true)}
+        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex gap-6">
-        <div className="w-64 flex-shrink-0 hidden md:block">
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        </div>
+      {/* Main Layout dengan Sidebar */}
+      <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row">
+        
+        {/* Sidebar Navigasi */}
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          userRole={currentUser.role}
+          schoolLogo={schoolLogo}
+          counts={{
+            students: students.length,
+            achievements: achievements.length,
+            alumni: alumni.length,
+            users: users.length,
+          }}
+        />
 
-        <main className="flex-1 min-w-0">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'usermanagement' && (
-            <UserManagement
-              users={users}
-              onSaveUser={handleSaveUser}
-              onDeleteUser={handleDeleteUser}
+        {/* Konten Halaman Aktif */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              students={students}
+              achievements={achievements}
+              alumni={alumni}
+              logs={logs}
+              userRole={currentUser.role}
+              schoolLogo={schoolLogo}
+              onNavigate={(tab) => setActiveTab(tab)}
             />
           )}
 
-          {activeTab !== 'dashboard' && activeTab !== 'usermanagement' && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center">
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">
-                Menu {activeTab}
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 font-bold">
-                Modul siap dihubungkan dengan data kesiswaan sekolah Anda.
-              </p>
-            </div>
+          {activeTab === 'students' && (
+            <StudentList
+              students={students}
+              userRole={currentUser.role}
+              schoolLogo={schoolLogo}
+              onAddStudent={() => {
+                setEditingStudent(null);
+                setIsStudentModalOpen(true);
+              }}
+              onEditStudent={(std) => {
+                setEditingStudent(std);
+                setIsStudentModalOpen(true);
+              }}
+              onDeleteStudent={handleDeleteStudent}
+              onViewStudentDetail={(std) => {
+                setSelectedStudentDetail(std);
+                setIsDetailModalOpen(true);
+              }}
+              onGraduateStudent={handleGraduateStudent}
+              onNavigateToImport={() => setActiveTab('excel-upload')}
+            />
           )}
+
+          {activeTab === 'excel-upload' && (
+            <ExcelUpload
+              onCommitImport={(imported) => {
+                setStudents((prev) => [...imported, ...prev]);
+                setActiveTab('students');
+              }}
+              existingStudents={students}
+            />
+          )}
+
+          {activeTab === 'achievements' && (
+            <AchievementList
+              achievements={achievements}
+              students={students}
+              userRole={currentUser.role}
+              onAddAchievement={(newAchData) => {
+                const newAch: Achievement = { ...newAchData, id: `ach-${Date.now()}`, createdAt: new Date().toISOString() };
+                setAchievements((prev) => [newAch, ...prev]);
+              }}
+              onDeleteAchievement={(id) => setAchievements((prev) => prev.filter((a) => a.id !== id))}
+            />
+          )}
+
+          {activeTab === 'alumni' && (
+            <AlumniList
+              alumni={alumni}
+              userRole={currentUser.role}
+              onAddAlumni={(newAlumniData) => {
+                const newAlm: Alumni = { ...newAlumniData, id: `alm-${Date.now()}`, updatedAt: new Date().toISOString() };
+                setAlumni((prev) => [newAlm, ...prev]);
+              }}
+              onDeleteAlumni={(id) => setAlumni((prev) => prev.filter((a) => a.id !== id))}
+            />
+          )}
+
+          {activeTab === 'users' && (
+            <UserManagement
+              users={users}
+              currentUser={currentUser}
+              onAddUser={(newUserData) => {
+                const newUser: User = { ...newUserData, id: `usr-${Date.now()}`, createdAt: new Date().toISOString() };
+                setUsers([...users, newUser]);
+              }}
+              onEditUser={handleEditUser}
+              onToggleUserStatus={(userId) => {
+                setUsers(users.map((u) => u.id === userId ? { ...u, status: u.status === 'aktif' ? 'nonaktif' : 'aktif' } : u));
+              }}
+              onDeleteUser={(userId) => setUsers(users.filter((u) => u.id !== userId))}
+            />
+          )}
+
+          {activeTab === 'technical-doc' && <TechnicalDoc />}
+
         </main>
       </div>
 
-      {showLogoModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center relative">
-            <button
-              onClick={() => setShowLogoModal(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-base font-black text-slate-900 mb-1">Unggah Logo Sekolah</h3>
-            <p className="text-xs text-slate-500 font-medium mb-5">Pilih file gambar logo sekolah Anda.</p>
+      {/* Modals */}
+      <SchoolLogoModal
+        isOpen={isLogoModalOpen}
+        onClose={() => setIsLogoModalOpen(false)}
+        currentLogo={schoolLogo}
+        onSaveLogo={(logo) => {
+          setSchoolLogo(logo);
+          if (logo) localStorage.setItem('sim_kesiswaan_school_logo', logo);
+          else localStorage.removeItem('sim_kesiswaan_school_logo');
+        }}
+      />
 
-            {schoolLogo && (
-              <img
-                src={schoolLogo}
-                alt="Preview"
-                className="w-20 h-20 object-contain mx-auto mb-4 border border-slate-200 rounded-2xl p-2"
-              />
-            )}
+      <SupabaseModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+        students={students}
+        onStudentsUpdated={(newStudents) => setStudents(newStudents)}
+      />
 
-            <label className="cursor-pointer inline-flex items-center space-x-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs transition shadow-lg shadow-blue-600/25">
-              <Upload className="w-4 h-4" />
-              <span>Pilih File Gambar</span>
-              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-            </label>
+      <StudentModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
+        onSave={handleSaveStudent}
+        initialData={editingStudent}
+      />
+
+      <StudentDetailModal
+        student={selectedStudentDetail}
+        achievements={achievements}
+        alumniRecord={alumni.find((a) => a.studentId === selectedStudentDetail?.id)}
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="font-bold">
+            SIM-KESISWAAN © {new Date().getFullYear()} • Sistem Manajemen Data Kesiswaan
           </div>
+          <button
+            onClick={() => setActiveTab('technical-doc')}
+            className="text-blue-600 hover:underline font-bold"
+          >
+            Rekomendasi Tech Stack & ERD
+          </button>
         </div>
-      )}
+      </footer>
 
-      {showDocModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative">
-            <button
-              onClick={() => setShowDocModal(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-2 mb-3">
-              <Info className="w-5 h-5 text-blue-600" />
-              <h3 className="text-base font-black text-slate-900">Dokumentasi Sistem</h3>
-            </div>
-            <div className="text-xs space-y-3 text-slate-600 font-medium leading-relaxed">
-              <p>SIM-KESISWAAN v2.5 - Akses Pengguna & Manajemen Siswa Terintegrasi.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSupabaseModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative text-center">
-            <button
-              onClick={() => setShowSupabaseModal(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <Database className="w-10 h-10 text-emerald-600 mx-auto mb-3" />
-            <h3 className="text-base font-black text-slate-900">Integrasi Database Cloud</h3>
-            <button
-              onClick={() => setShowSupabaseModal(false)}
-              className="mt-4 w-full py-2.5 bg-emerald-600 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20"
-            >
-              Tutup Info
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-export default App;

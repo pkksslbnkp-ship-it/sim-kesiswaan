@@ -1,43 +1,141 @@
-export interface UserAccount {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  role: string;
-  status: string;
-  password?: string;
-  lastLogin?: string;
-}
+import { Student, Achievement, Alumni, ActivityLog, User } from '../types';
 
-export const INITIAL_USERS: UserAccount[] = [
+export const INITIAL_USERS: User[] = [
   {
-    id: '1',
-    name: 'Administrator Utama',
-    username: 'admin',
+    id: 'usr-1',
+    name: 'Ahmad Dahlan, M.Pd.',
     email: 'admin@sekolah.sch.id',
-    role: 'Admin (Waka Kesiswaan)',
-    status: 'Aktif',
-    password: 'admin123',
-    lastLogin: '2026-08-08 12:30',
+    role: 'admin',
+    status: 'aktif',
+    createdAt: '2024-01-10T08:00:00.000Z',
   },
   {
-    id: '2',
-    name: 'Tim Kesiswaan',
-    username: 'kesiswaan',
-    email: 'kesiswaan@sekolah.sch.id',
-    role: 'Guru (Read-only)',
+    id: 'usr-2',
+    name: 'Siti Nurhaliza, S.Pd.',
+    email: 'guru@sekolah.sch.id',
+    role: 'user',
+    status: 'aktif',
+    createdAt: '2024-01-15T09:30:00.000Z',
+  },
+];
+
+export const INITIAL_STUDENTS: Student[] = [
+  {
+    id: 'std-1',
+    nisn: '0051234561',
+    nis: '23241001',
+    name: 'Andi Pratama',
+    gender: 'L',
+    class: '10 MIPA 1',
+    major: 'MIPA',
+    generation: '2025/2026',
+    entryYear: 2025,
     status: 'Aktif',
-    password: 'guru123',
-    lastLogin: '2026-08-07 09:15',
+    birthPlace: 'Jakarta',
+    birthDate: '2008-05-12',
+    address: 'Jl. Merdeka No. 12, Jakarta',
+    phone: '081234567890',
+    parentName: 'Budi Pratama',
+    parentPhone: '081298765432',
+    notes: 'Ketua Kelas',
+    createdAt: '2025-07-15T08:00:00.000Z',
   },
   {
-    id: '3',
-    name: 'Wali Kelas X IPA 1',
-    username: 'walikelas10',
-    email: 'walikelas@sekolah.sch.id',
-    role: 'Guru (Read-only)',
+    id: 'std-2',
+    nisn: '0051234562',
+    nis: '23241002',
+    name: 'Siti Rahmawati',
+    gender: 'P',
+    class: '11 IPS 2',
+    major: 'IPS',
+    generation: '2024/2025',
+    entryYear: 2024,
     status: 'Aktif',
-    password: 'guru123',
-    lastLogin: '2026-08-06 14:20',
+    birthPlace: 'Bandung',
+    birthDate: '2007-09-20',
+    address: 'Jl. Mawar No. 45, Bandung',
+    phone: '082134567891',
+    parentName: 'Rahmat Hidayat',
+    parentPhone: '082198765433',
+    notes: 'Anggota OSIS',
+    createdAt: '2024-07-15T08:00:00.000Z',
+  },
+];
+
+export const INITIAL_ACHIEVEMENTS: Achievement[] = [
+  {
+    id: 'ach-1',
+    studentId: 'std-1',
+    studentName: 'Andi Pratama',
+    studentClass: '10 MIPA 1',
+    title: 'Olimpiade Sains Nasional (OSN) Matematika',
+    category: 'Akademik',
+    level: 'Nasional',
+    rank: 'Juara 1',
+    organizer: 'Kemendikbudristek',
+    eventDate: '2025-04-10',
+    certificateUrl: '',
+    notes: 'Mendapatkan Medali Emas',
+    createdAt: '2025-04-12T10:00:00.000Z',
+  },
+  {
+    id: 'ach-2',
+    studentId: 'std-2',
+    studentName: 'Siti Rahmawati',
+    studentClass: '11 IPS 2',
+    title: 'Lomba Debat Bahasa Indonesia',
+    category: 'Non-Akademik',
+    level: 'Provinsi',
+    rank: 'Juara 2',
+    organizer: 'Dinas Pendidikan Provinsi',
+    eventDate: '2025-05-18',
+    certificateUrl: '',
+    notes: 'Mewakili Sekolah di Tingkat Provinsi',
+    createdAt: '2025-05-20T11:00:00.000Z',
+  },
+];
+
+export const INITIAL_ALUMNI: Alumni[] = [
+  {
+    id: 'alm-1',
+    studentId: 'std-old-1',
+    nisn: '0031234599',
+    name: 'Budi Santoso',
+    graduationYear: 2024,
+    major: 'MIPA',
+    currentStatus: 'Kuliah',
+    institutionName: 'Universitas Indonesia',
+    positionOrMajor: 'Teknik Informatika',
+    phone: '081345678901',
+    address: 'Depok, Jawa Barat',
+    notes: 'Jalur SNBP',
+    updatedAt: '2024-08-01T09:00:00.000Z',
+  },
+  {
+    id: 'alm-2',
+    studentId: 'std-old-2',
+    nisn: '0031234598',
+    name: 'Dewi Lestari',
+    graduationYear: 2024,
+    major: 'IPS',
+    currentStatus: 'Bekerja',
+    institutionName: 'PT Bank Central Asia',
+    positionOrMajor: 'Customer Service',
+    phone: '081345678902',
+    address: 'Jakarta Selatan',
+    notes: 'Program Internship',
+    updatedAt: '2024-08-05T10:00:00.000Z',
+  },
+];
+
+export const INITIAL_LOGS: ActivityLog[] = [
+  {
+    id: 'log-1',
+    userId: 'usr-1',
+    userName: 'Ahmad Dahlan, M.Pd.',
+    userRole: 'admin',
+    action: 'SYSTEM_INIT',
+    details: 'Inisialisasi sistem manajemen kesiswaan',
+    timestamp: new Date().toISOString(),
   },
 ];

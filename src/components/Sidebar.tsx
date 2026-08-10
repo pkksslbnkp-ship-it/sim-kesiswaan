@@ -12,7 +12,6 @@ import {
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  // Prop opsional jika Sidebar menerima data/jumlah
   counts?: {
     students?: number;
     achievements?: number;
@@ -36,10 +35,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'students',
       label: 'Data Siswa',
       icon: Users,
-      badge: counts?.students ?? 8, // Menggunakan ?. agar aman dari error undefined
+      badge: counts?.students ?? 8,
     },
     {
-      id: 'import',
+      id: 'excel-upload', // 👈 DIUBAH: dari 'import' menjadi 'excel-upload'
       label: 'Upload & Import Excel',
       icon: Upload,
       tag: 'Admin',
@@ -57,13 +56,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: counts?.alumni ?? 4,
     },
     {
-      id: 'usermanagement',
+      id: 'users', // 👈 DIUBAH: dari 'usermanagement' menjadi 'users'
       label: 'Manajemen Pengguna',
       icon: UserCheck,
       badge: counts?.users ?? 3,
     },
     {
-      id: 'erd',
+      id: 'technical-doc', // 👈 DIUBAH: dari 'erd' menjadi 'technical-doc'
       label: 'Rekomendasi Tech & ERD',
       icon: FileCode,
       tag: 'Docs',
@@ -99,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'

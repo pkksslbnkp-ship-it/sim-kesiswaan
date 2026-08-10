@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { 
   Student, 
   Achievement, 
@@ -32,72 +32,74 @@ import {
   Legend 
 } from 'recharts';
 
-interface DashboardProps {
+export interface DashboardProps {
   students: Student[];
   achievements: Achievement[];
   alumni: Alumni[];
-  logs: ActivityLog[];
+  logs?: ActivityLog[];
   userRole: UserRole;
   schoolLogo?: string | null;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: any) => void;
 }
 
-const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
-
-export const Dashboard: React.FC<DashboardProps> = ({
-  students,
-  achievements,
-  alumni,
-  logs,
+export const DashboardOverview: React.FC<DashboardProps> = ({
+  students = [],
+  achievements = [],
+  alumni = [],
+  logs = [],
   userRole,
   schoolLogo,
   onNavigate,
 }) => {
   const isAdmin = userRole === 'admin';
 
-  // Memoized stats calculation for better performance
-  const studentStats = useMemo(() => {
-    const total = students.length;
-    const active = students.filter((s) => s.status === 'Aktif').length;
-    const male = students.filter((s) => s.gender === 'L').length;
-    const female = students.filter((s) => s.gender === 'P').length;
-    return { total, active, male, female };
-  }, [students]);
+  // Stats calculation
+  const totalStudents = students.length;
+  const activeStudents = students.filter((s) => s.status === 'Aktif').length;
+  const totalAchievements = achievements.length;
+  const totalAlumni = alumni.length;
 
-  // Memoized Chart 1: Distribution by Major
-  const majorChartData = useMemo(() => {
-    const majorCounts: Record<string, number> = {};
-    students.forEach((s) => {
-      const major = s.major || 'Lainnya';
-      majorCounts[major] = (majorCounts[major] || 0) + 1;
-    });
-    return Object.keys(majorCounts).map((key) => ({
-      name: key,
-      jumlah: majorCounts[key],
-    }));
-  }, [students]);
+  const maleCount = students.filter((s) => s.gender === 'L').length;
+  const femaleCount = students.filter((s) => s.gender === 'P').length;
 
-  // Memoized Chart 2: Alumni Current Status
-  const alumniPieData = useMemo(() => {
-    const alumniStatusCounts: Record<string, number> = {
-      Kuliah: 0,
-      Bekerja: 0,
-      Wirausaha: 0,
-      'Mencari Kerja': 0,
-    };
-    alumni.forEach((a) => {
-      if (alumniStatusCounts[a.currentStatus] !== undefined) {
-        alumniStatusCounts[a.currentStatus] += 1;
-      }
-    });
-    return Object.keys(alumniStatusCounts).map((key) => ({
-      name: key,
-      value: alumniStatusCounts[key],
-    }));
-  }, [alumni]);
+  // Chart 1: Distribution by Major (Jurusan)
+  const majorCounts: { [key: string]: number } = {};
+  students.forEach((s) => {
+    const major = s.major || 'Lainnya';
+    majorCounts[major] = (majorCounts[major] || 0) + 1;
+  });
+  const majorChartData = Object.keys(majorCounts).map((key) => ({
+    name: key,
+    jumlah: majorCounts[key],
+  }));
+
+  // Chart 2: Achievements by Level
+  const levelCounts: { [key: string]: number } = {};
+  achievements.forEach((a) => {
+    levelCounts[a.level] = (levelCounts[a.level] || 0) + 1;
+  });
+
+  // Chart 3: Alumni Current Status
+  const alumniStatusCounts: { [key: string]: number } = {
+    Kuliah: 0,
+    Bekerja: 0,
+    Wirausaha: 0,
+    'Mencari Kerja': 0,
+  };
+  alumni.forEach((a) => {
+    if (alumniStatusCounts[a.currentStatus] !== undefined) {
+      alumniStatusCounts[a.currentStatus] += 1;
+    }
+  });
+  const alumniPieData = Object.keys(alumniStatusCounts).map((key) => ({
+    name: key,
+    value: alumniStatusCounts[key],
+  }));
+
+  const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
       {/* Welcome Hero Banner */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 relative overflow-hidden">
@@ -133,7 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition flex items-center space-x-2 cursor-pointer"
               >
                 <Users className="w-4 h-4 text-blue-400" />
-                <span>Cari Data Siswa ({studentStats.total})</span>
+                <span>Cari Data Siswa ({totalStudents})</span>
               </button>
               <button
                 onClick={() => onNavigate('technical-doc')}
@@ -169,28 +171,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         
         {/* Card 1: Total Siswa */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition hover:shadow-md">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs transition hover:shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Total Siswa Terdata</div>
-              <div className="text-5xl font-black tracking-tighter text-slate-900">{studentStats.total}</div>
+              <div className="text-5xl font-black tracking-tighter text-slate-900">{totalStudents}</div>
             </div>
             <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
               <Users className="w-6 h-6" />
             </div>
           </div>
           <div className="text-emerald-600 text-sm font-bold mt-3 flex items-center justify-between">
-            <span>Siswa Aktif: {studentStats.active}</span>
-            <span className="text-slate-400 text-xs font-semibold">{studentStats.male} L / {studentStats.female} P</span>
+            <span>Siswa Aktif: {activeStudents}</span>
+            <span className="text-slate-400 text-xs font-semibold">{maleCount} L / {femaleCount} P</span>
           </div>
         </div>
 
         {/* Card 2: Total Prestasi */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition hover:shadow-md">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs transition hover:shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Prestasi Terdaftar</div>
-              <div className="text-5xl font-black tracking-tighter text-amber-600">{achievements.length}</div>
+              <div className="text-5xl font-black tracking-tighter text-amber-600">{totalAchievements}</div>
             </div>
             <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
               <Trophy className="w-6 h-6" />
@@ -205,11 +207,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Card 3: Total Alumni */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition hover:shadow-md">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs transition hover:shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Alumni Terlacak</div>
-              <div className="text-5xl font-black tracking-tighter text-indigo-600">{alumni.length}</div>
+              <div className="text-5xl font-black tracking-tighter text-indigo-600">{totalAlumni}</div>
             </div>
             <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
               <GraduationCap className="w-6 h-6" />
@@ -222,7 +224,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Card 4: Status Akses RBAC */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition hover:shadow-md">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs transition hover:shadow-md">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Akses Hak Peran</div>
@@ -245,7 +247,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Action Banner Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between shadow-sm">
+        <div className="bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between shadow-xs">
           <div className="space-y-1">
             <h4 className="font-black text-xl tracking-tight">Upload Data Baru?</h4>
             <p className="text-blue-100 text-xs font-medium">Import file .xlsx untuk sinkronisasi otomatis</p>
@@ -258,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
 
-        <div className="bg-slate-900 text-white p-6 rounded-2xl flex items-center justify-between shadow-sm">
+        <div className="bg-slate-900 text-white p-6 rounded-2xl flex items-center justify-between shadow-xs">
           <div className="space-y-1">
             <h4 className="font-black text-xl tracking-tight">Manajemen Role</h4>
             <p className="text-slate-400 text-xs font-medium">Kelola hak akses Guru dan Staff</p>
@@ -276,7 +278,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Chart 1: Distribusi Siswa per Jurusan */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div>
               <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
@@ -301,7 +303,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Chart 2: Sebaran Karir Alumni */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div>
               <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
@@ -343,7 +345,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Latest Achievements */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
               <Award className="w-5 h-5 text-amber-600" />
@@ -358,9 +360,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="mt-4 space-y-3">
-            {achievements.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-4 text-center">Belum ada data prestasi tercatat.</p>
-            ) : (
+            {achievements.length > 0 ? (
               achievements.slice(0, 3).map((item) => (
                 <div
                   key={item.id}
@@ -383,12 +383,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
               ))
+            ) : (
+              <p className="text-xs text-slate-400 font-medium py-4 text-center">Belum ada data prestasi recorded.</p>
             )}
           </div>
         </div>
 
         {/* Activity Logs */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
               <Clock className="w-5 h-5 text-indigo-600" />
@@ -398,9 +400,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="mt-4 space-y-3">
-            {logs.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-4 text-center">Belum ada aktivitas tercatat.</p>
-            ) : (
+            {logs.length > 0 ? (
               logs.slice(0, 4).map((log) => (
                 <div key={log.id} className="text-xs p-3 rounded-xl bg-slate-50 border border-slate-100">
                   <div className="flex justify-between items-center text-[11px] text-slate-500 mb-1">
@@ -410,6 +410,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <p className="text-slate-700 font-medium">{log.details}</p>
                 </div>
               ))
+            ) : (
+              <p className="text-xs text-slate-400 font-medium py-4 text-center">Sistem aktif. Belum ada entri log audit.</p>
             )}
           </div>
         </div>
@@ -419,3 +421,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 };
+
+export const Dashboard = DashboardOverview;
+export default DashboardOverview;

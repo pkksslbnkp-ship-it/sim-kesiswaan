@@ -1,395 +1,292 @@
 import React, { useState, useMemo } from 'react';
+import { Student } from '../types';
 import { 
-  Alumni, 
-  AlumniCurrentStatus, 
-  UserRole 
-} from '../types';
-import { 
-  GraduationCap, 
+  FileSpreadsheet, 
+  Printer, 
   Search, 
-  Building2, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Plus, 
-  Trash2, 
-  X, 
-  Save 
+  Filter, 
+  RotateCcw, 
+  Users, 
+  Eye, 
+  Trash2,
+  GraduationCap 
 } from 'lucide-react';
 
 interface AlumniListProps {
-  alumni: Alumni[];
-  userRole: UserRole;
-  onAddAlumni: (newAlumni: Omit<Alumni, 'id' | 'updatedAt'>) => void;
-  onDeleteAlumni: (id: string) => void;
+  students: Student[];
+  userRole: 'ADMIN' | 'GURU';
+  onViewStudentDetail: (student: Student) => void;
+  onDeleteStudent: (id: string) => void;
 }
 
 export const AlumniList: React.FC<AlumniListProps> = ({
-  alumni,
+  students = [],
   userRole,
-  onAddAlumni,
-  onDeleteAlumni,
+  onViewStudentDetail,
+  onDeleteStudent,
 }) => {
-  const canManage = true;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGender, setSelectedGender] = useState<string>('SEMUA');
+  const [selectedGradYear, setSelectedGradYear] = useState<string>('SEMUA');
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [yearFilter, setYearFilter] = useState<string>('All');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  // Khusus menyaring data siswa berpangkat / berstatus 'Lulus'
+  const alumniStudents = useMemo(() => {
+    return students.filter((s) => s.status === 'Lulus');
+  }, [students]);
 
-  // Add Alumni Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    studentId: `std-al-${Date.now()}`,
-    nisn: '',
-    name: '',
-    graduationYear: 2025,
-    major: 'MIPA',
-    currentStatus: 'Kuliah' as AlumniCurrentStatus,
-    institutionName: '',
-    positionOrMajor: '',
-    phone: '',
-    email: '',
-    address: '',
-    notes: '',
-  });
+  // Daftar Opsi Tahun Lulus Dinamis
+  const graduationYears = useMemo(() => {
+    const years = Array.from(new Set(alumniStudents.map((s) => s.graduationYear).filter(Boolean)));
+    return ['SEMUA', ...years.sort().reverse()];
+  }, [alumniStudents]);
 
-  const uniqueYears = useMemo(
-    () => Array.from(new Set(alumni.map((a) => a.graduationYear))).sort((a, b) => Number(b) - Number(a)),
-    [alumni]
-  );
+  // Reset Filter
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedGender('SEMUA');
+    setSelectedGradYear('SEMUA');
+  };
 
-  const filtered = useMemo(() => {
-    return alumni.filter((item) => {
-      if (search) {
-        const q = search.toLowerCase();
-        const matchName = item.name.toLowerCase().includes(q);
-        const matchInst = (item.institutionName || '').toLowerCase().includes(q);
-        const matchNisn = item.nisn.includes(q);
-        if (!matchName && !matchInst && !matchNisn) return false;
-      }
+  // Filter Data Alumni
+  const filteredAlumni = useMemo(() => {
+    return alumniStudents.filter((student) => {
+      const matchSearch =
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.nisn && student.nisn.includes(searchTerm)) ||
+        (student.nis && student.nis.includes(searchTerm));
 
-      if (yearFilter !== 'All' && item.graduationYear !== parseInt(yearFilter)) return false;
-      if (statusFilter !== 'All' && item.currentStatus !== statusFilter) return false;
+      const matchGender = selectedGender === 'SEMUA' || student.gender === selectedGender;
+      const matchYear = selectedGradYear === 'SEMUA' || String(student.graduationYear) === selectedGradYear;
 
-      return true;
+      return matchSearch && matchGender && matchYear;
     });
-  }, [alumni, search, yearFilter, statusFilter]);
+  }, [alumniStudents, searchTerm, selectedGender, selectedGradYear]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.nisn) {
-      alert('Nama Alumni dan NISN wajib diisi!');
+  // Rekapitulasi Data Alumni Terfilter
+  const rekap = useMemo(() => {
+    const total = filteredAlumni.length;
+    const male = filteredAlumni.filter((s) => s.gender === 'L').length;
+    const female = filteredAlumni.filter((s) => s.gender === 'P').length;
+
+    return { total, male, female };
+  }, [filteredAlumni]);
+
+  // Export CSV
+  const handleExportExcel = () => {
+    if (filteredAlumni.length === 0) {
+      alert('Tidak ada data alumni untuk di-export.');
       return;
     }
 
-    onAddAlumni({
-      studentId: formData.studentId,
-      nisn: formData.nisn,
-      name: formData.name,
-      graduationYear: formData.graduationYear,
-      major: formData.major,
-      currentStatus: formData.currentStatus,
-      institutionName: formData.institutionName,
-      positionOrMajor: formData.positionOrMajor,
-      phone: formData.phone,
-      email: formData.email,
-      address: formData.address,
-      notes: formData.notes,
-    });
+    const headers = ['NO', 'NISN', 'NIS', 'NAMA ALUMNI', 'GENDER', 'TAHUN LULUS', 'CATATAN / STATUS'];
+    const rows = filteredAlumni.map((s, idx) => [
+      idx + 1,
+      `"${s.nisn || ''}"`,
+      `"${s.nis || ''}"`,
+      `"${s.name || ''}"`,
+      `"${s.gender || ''}"`,
+      `"${s.graduationYear || '-'}"`,
+      `"${s.status || 'Lulus'}"`
+    ]);
 
-    setIsModalOpen(false);
-    setFormData({
-      studentId: `std-al-${Date.now()}`,
-      nisn: '',
-      name: '',
-      graduationYear: 2025,
-      major: 'MIPA',
-      currentStatus: 'Kuliah',
-      institutionName: '',
-      positionOrMajor: '',
-      phone: '',
-      email: '',
-      address: '',
-      notes: '',
-    });
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Data_Alumni_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
     <div className="space-y-6">
-      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Modul Data Alumni & Tracer Study</h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Pelacakan aktivitas alumni (Kuliah, Bekerja, Wirausaha) pasca kelulusan.
-              </p>
-            </div>
+            <h2 className="text-xl font-bold text-slate-800">Data & Direktori Alumni</h2>
+            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">
+              {filteredAlumni.length} Alumni
+            </span>
           </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Daftar siswa yang telah menyelesaikan masa studi / lulus.
+          </p>
         </div>
 
-        {canManage && (
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-indigo-600/20 transition flex items-center space-x-2"
+            type="button"
+            onClick={handleExportExcel}
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Data Alumni</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Export Excel</span>
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-rose-500" />
+            <span>Cetak PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
-        
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Cari Alumni, Kampus, Perusahaan..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-blue-600" />
+            <span>Filter Data Alumni</span>
+          </div>
+          {(searchTerm || selectedGender !== 'SEMUA' || selectedGradYear !== 'SEMUA') && (
+            <button
+              onClick={handleResetFilters}
+              className="flex items-center space-x-1 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg transition cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Filter</span>
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center space-x-3 w-full md:w-auto">
-          {/* Tahun Lulus Filter */}
-          <select
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="All">Semua Tahun Lulus</option>
-            {uniqueYears.map((y) => (
-              <option key={y} value={y}>Lulus {y}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari Nama / NISN / NIS Alumni..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none transition"
+            />
+          </div>
 
-          {/* Status Karir Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="All">Status: Semua</option>
-            <option value="Kuliah">Kuliah</option>
-            <option value="Bekerja">Bekerja</option>
-            <option value="Wirausaha">Wirausaha</option>
-            <option value="Mencari Kerja">Mencari Kerja</option>
-          </select>
+          <div>
+            <select
+              value={selectedGender}
+              onChange={(e) => setSelectedGender(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+            >
+              <option value="SEMUA">Semua Gender</option>
+              <option value="L">Laki-Laki (L)</option>
+              <option value="P">Perempuan (P)</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={selectedGradYear}
+              onChange={(e) => setSelectedGradYear(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+            >
+              <option value="SEMUA">Semua Tahun Lulus</option>
+              {graduationYears.filter(y => y !== 'SEMUA').map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
         </div>
-
       </div>
 
-      {/* Alumni Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* Tabel Alumni */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">NISN & Nama Alumni</th>
-                <th className="p-3.5">Tahun Lulus & Jurusan</th>
-                <th className="p-3.5">Status Karir</th>
-                <th className="p-3.5">Instansi / Perusahaan / PTN</th>
-                <th className="p-3.5">Program Studi / Jabatan</th>
-                <th className="p-3.5">Kontak</th>
-                {canManage && <th className="p-3.5 text-center">Aksi</th>}
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="p-4 w-12 text-center">NO</th>
+                <th className="p-4">NISN / NIS</th>
+                <th className="p-4">NAMA ALUMNI</th>
+                <th className="p-4">GENDER</th>
+                <th className="p-4">TAHUN LULUS</th>
+                <th className="p-4 text-center">AKSI</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400 font-semibold">
-                    Tidak ada data alumni yang cocok dengan kriteria filter.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition">
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900">{item.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">NISN: {item.nisn}</div>
+            <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+              {filteredAlumni.length > 0 ? (
+                filteredAlumni.map((student, index) => (
+                  <tr key={student.id} className="hover:bg-slate-50/80 transition">
+                    <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
+                    <td className="p-4">
+                      <div className="font-mono font-bold text-slate-800">{student.nisn || '-'}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{student.nis || '-'}</div>
                     </td>
-
-                    <td className="p-3.5">
-                      <div className="font-bold text-indigo-700">Lulus {item.graduationYear}</div>
-                      <div className="text-[10px] text-slate-500 font-semibold">{item.major}</div>
+                    <td 
+                      onClick={() => onViewStudentDetail(student)}
+                      className="p-4 font-bold text-slate-800 hover:text-blue-600 cursor-pointer transition"
+                    >
+                      {student.name}
                     </td>
-
-                    <td className="p-3.5">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        item.currentStatus === 'Kuliah'
-                          ? 'bg-blue-100 text-blue-900 border border-blue-200'
-                          : item.currentStatus === 'Bekerja'
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-                          : item.currentStatus === 'Wirausaha'
-                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                          : 'bg-slate-100 text-slate-800 border border-slate-200'
-                      }`}>
-                        {item.currentStatus}
+                    <td className="p-4 font-semibold text-slate-600">{student.gender}</td>
+                    <td className="p-4">
+                      <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-md text-[11px]">
+                        {student.graduationYear || 'Lulus'}
                       </span>
                     </td>
-
-                    <td className="p-3.5 font-bold text-slate-800">
-                      {item.institutionName || '-'}
-                    </td>
-
-                    <td className="p-3.5 font-semibold text-slate-600">
-                      {item.positionOrMajor || '-'}
-                    </td>
-
-                    <td className="p-3.5">
-                      <div className="text-emerald-700 font-mono font-bold">{item.phone}</div>
-                      {item.email && <div className="text-[10px] text-slate-400">{item.email}</div>}
-                    </td>
-
-                    {canManage && (
-                      <td className="p-3.5 text-center">
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center space-x-1.5">
                         <button
-                          onClick={() => onDeleteAlumni(item.id)}
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 transition"
-                          title="Hapus Data Alumni"
+                          type="button"
+                          onClick={() => onViewStudentDetail(student)}
+                          className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                          title="Lihat Detail Alumni"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Eye className="w-4 h-4" />
                         </button>
-                      </td>
-                    )}
+                        {userRole === 'ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteStudent(student.id)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            title="Hapus Data Alumni"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
+                    Tidak ada data alumni yang ditemukan.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 text-slate-900 space-y-4">
-            
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="text-lg font-black text-slate-900 flex items-center space-x-2">
-                <GraduationCap className="w-5 h-5 text-indigo-600" />
-                <span>Tambah Catatan Alumni</span>
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Rekapitulasi Ringkasan Hasil Filter Alumni */}
+      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+          <GraduationCap className="w-4 h-4 text-blue-400" />
+          <span>Rekapitulasi Hasil Filter Data Alumni</span>
+        </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">NISN *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="0057890123"
-                  value={formData.nisn}
-                  onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+            <span className="block text-[10px] text-slate-400 font-bold uppercase">Total Alumni Terfilter</span>
+            <span className="text-2xl font-black text-white mt-0.5 block">{rekap.total}</span>
+          </div>
 
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Nama Lengkap Alumni *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nama Alumni"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
+          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+            <span className="block text-[10px] text-slate-400 font-bold uppercase">Laki-Laki (L)</span>
+            <span className="text-2xl font-black text-blue-400 mt-0.5 block">{rekap.male}</span>
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1">Tahun Lulus</label>
-                  <input
-                    type="number"
-                    value={formData.graduationYear}
-                    onChange={(e) => setFormData({ ...formData, graduationYear: parseInt(e.target.value) || 2025 })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1">Status Karir Saat Ini</label>
-                  <select
-                    value={formData.currentStatus}
-                    onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="Kuliah">Kuliah</option>
-                    <option value="Bekerja">Bekerja</option>
-                    <option value="Wirausaha">Wirausaha</option>
-                    <option value="Mencari Kerja">Mencari Kerja</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Nama Perguruan Tinggi / Perusahaan</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: ITB, UNPAD, PT Telkom"
-                  value={formData.institutionName}
-                  onChange={(e) => setFormData({ ...formData, institutionName: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Jurusan Kuliah / Jabatan Kerja</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: S1 Teknik Informatika / Software Engineer"
-                  value={formData.positionOrMajor}
-                  onChange={(e) => setFormData({ ...formData, positionOrMajor: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">No. HP / WhatsApp Active</label>
-                <input
-                  type="text"
-                  placeholder="08123456789"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider shadow-md"
-                >
-                  Simpan Alumni
-                </button>
-              </div>
-
-            </form>
-
+          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+            <span className="block text-[10px] text-slate-400 font-bold uppercase">Perempuan (P)</span>
+            <span className="text-2xl font-black text-pink-400 mt-0.5 block">{rekap.female}</span>
           </div>
         </div>
-      )}
+      </div>
 
     </div>
   );
