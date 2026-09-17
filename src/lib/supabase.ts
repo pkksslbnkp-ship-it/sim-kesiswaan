@@ -15,24 +15,37 @@ export const getSupabaseConfig = () => {
 export const saveSupabaseConfig = (url: string, key: string) => {
   localStorage.setItem('sim_kesiswaan_supabase_url', url.trim());
   localStorage.setItem('sim_kesiswaan_supabase_key', key.trim());
+  resetSupabaseClient();
 };
 
 export const clearSupabaseConfig = () => {
   localStorage.removeItem('sim_kesiswaan_supabase_url');
   localStorage.removeItem('sim_kesiswaan_supabase_key');
+  resetSupabaseClient();
 };
 
-let cachedClient: SupabaseClient | null = null;
+// Global Instance Singleton
+let supabaseInstance: SupabaseClient | null = null;
+let currentConfigKey = '';
 
 export const getSupabaseClient = (): SupabaseClient | null => {
   const { url, key } = getSupabaseConfig();
   if (!url || !key) return null;
 
+  const configKey = `${url}_${key}`;
+
   try {
-    if (!cachedClient) {
-      cachedClient = createClient(url, key);
+    if (!supabaseInstance || currentConfigKey !== configKey) {
+      supabaseInstance = createClient(url, key, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+      });
+      currentConfigKey = configKey;
     }
-    return cachedClient;
+    return supabaseInstance;
   } catch (err) {
     console.error('Error initializing Supabase client:', err);
     return null;
@@ -40,7 +53,8 @@ export const getSupabaseClient = (): SupabaseClient | null => {
 };
 
 export const resetSupabaseClient = () => {
-  cachedClient = null;
+  supabaseInstance = null;
+  currentConfigKey = '';
 };
 
 // Check connection status
@@ -51,10 +65,8 @@ export const checkSupabaseConnection = async (): Promise<{ success: boolean; mes
   }
 
   try {
-    // Try querying a dummy table or auth
     const { error } = await client.from('students').select('id').limit(1);
     if (error && error.code !== 'PGRST116') {
-      // If table doesn't exist yet, it's still connected!
       if (error.message.includes('relation "public.students" does not exist')) {
         return { success: fontSuccess(true), message: 'Terhubung ke Supabase! (Tabel belum dibuat, silakan jalankan SQL Schema)' };
       }
@@ -70,7 +82,7 @@ function fontSuccess(connected: boolean): boolean {
   return connected;
 }
 
-// SQL DDL Generator for easy Supabase SQL Editor setup
+// SQL DDL Generator
 export const getSupabaseTableSQL = () => {
   return `-- SQL Schema Setup untuk SIM-KESISWAAN
 -- Jalankan kode ini di SQL Editor dashboard Supabase Anda
@@ -97,7 +109,19 @@ CREATE TABLE IF NOT EXISTS public.students (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Tabel Prestasi (achievements)
+-- 2. Tabel Pengguna / Username (users)
+CREATE TABLE IF NOT EXISTS public.users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  role TEXT DEFAULT 'GURU',
+  status TEXT DEFAULT 'aktif',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Tabel Prestasi (achievements)
 CREATE TABLE IF NOT EXISTS public.achievements (
   id TEXT PRIMARY KEY,
   student_id TEXT NOT NULL,
@@ -112,7 +136,7 @@ CREATE TABLE IF NOT EXISTS public.achievements (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Tabel Alumni (alumni)
+-- 4. Tabel Alumni (alumni)
 CREATE TABLE IF NOT EXISTS public.alumni (
   id TEXT PRIMARY KEY,
   student_id TEXT,
@@ -129,18 +153,134 @@ CREATE TABLE IF NOT EXISTS public.alumni (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Enable Row Level Security (RLS) & Public Policies (Optional / Recommended)
+-- 5. Enable Row Level Security (RLS) & Public Policies
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alumni ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read-write for students" ON public.students FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read-write for users" ON public.users FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read-write for achievements" ON public.achievements FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read-write for alumni" ON public.alumni FOR ALL USING (true) WITH CHECK (true);
 `;
 };
 
-// Sync Students
+// --- API USERS (SUPABASE) ---
+
+// Ambil daftar user dari Supabase
+export const fetchUsersFromSupabase = async (): Promise<User[] | null> => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.from('users').select('*').order('created_at', { ascending: true });
+    if (error || !data) return null;
+
+    return data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email || '',
+      username: row.username,
+      password: row.password,
+      role: row.role as 'ADMIN' | 'GURU',
+      status: row.status as 'aktif' | 'nonaktif',
+      createdAt: row.created_at,
+    }));
+  } catch (e) {
+    console.error('Failed to fetch users from Supabase:', e);
+    return null;
+  }
+};
+
+// Simpan/Update Single User ke Supabase
+export const syncUserToSupabase = async (user: User): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    alert('Koneksi Supabase belum aktif! Silakan periksa URL & Anon Key.');
+    return false;
+  }
+
+  try {
+    const payload = {
+      id: user.id,
+      name: user.name,
+      email: user.email || `${user.username}@sekolah.sch.id`,
+      username: user.username,
+      password: user.password || 'password123',
+      role: user.role || 'GURU',
+      status: user.status || 'aktif',
+    };
+
+    // Diubah ke onConflict: 'username' agar jika username sudah ada, tidak memicu unique constraint error
+    const { data, error } = await client
+      .from('users')
+      .upsert(payload, { onConflict: 'username' })
+      .select();
+
+    if (error) {
+      console.error('Supabase user upsert error:', error);
+      alert(`Gagal menyimpan user ke Supabase!\n\nPesan: ${error.message}\nKode: ${error.code}`);
+      return false;
+    }
+
+    console.log('User berhasil disimpan ke Supabase:', data);
+    return true;
+  } catch (e: any) {
+    console.error('Failed to sync single user to Supabase:', e);
+    alert(`Terjadi error koneksi: ${e.message || 'Gagal terhubung ke Supabase'}`);
+    return false;
+  }
+};
+
+// Sync Seluruh Array Users ke Supabase
+export const syncUsersToSupabase = async (users: User[]): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const formattedData = users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email || `${u.username}@sekolah.sch.id`,
+      username: u.username,
+      password: u.password || 'password',
+      role: u.role,
+      status: u.status || 'aktif',
+    }));
+
+    const { error } = await client.from('users').upsert(formattedData, { onConflict: 'username' });
+    if (error) {
+      console.warn('Supabase users bulk upsert error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed to bulk sync users to Supabase:', e);
+    return false;
+  }
+};
+
+// Hapus User dari Supabase
+export const deleteUserFromSupabase = async (userId: string): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('users').delete().eq('id', userId);
+    if (error) {
+      console.warn('Supabase user delete error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed to delete user from Supabase:', e);
+    return false;
+  }
+};
+
+// --- API STUDENTS (SUPABASE) ---
+
 export const syncStudentsToSupabase = async (students: Student[]): Promise<boolean> => {
   const client = getSupabaseClient();
   if (!client) return false;
@@ -218,7 +358,6 @@ export interface SupabaseInsertResult {
   errorDetail?: any;
 }
 
-// Directly insert parsed Excel students into Supabase table 'students'
 export const insertExcelStudentsToSupabase = async (
   extractedStudents: Array<{
     nisn: string;
@@ -249,7 +388,6 @@ export const insertExcelStudentsToSupabase = async (
     };
   }
 
-  // Format 1: Standard Schema (without id property so Supabase auto-generates auto-increment ID)
   const standardRows = extractedStudents.map((s) => ({
     nisn: s.nisn,
     nis: s.nis || '',
@@ -265,7 +403,6 @@ export const insertExcelStudentsToSupabase = async (
   }));
 
   try {
-    // Attempt 1: Insert standard rows using supabase.from('students').insert()
     const { data, error } = await client.from('students').insert(standardRows).select();
 
     if (!error) {
@@ -276,9 +413,6 @@ export const insertExcelStudentsToSupabase = async (
       };
     }
 
-    console.warn('Supabase standard insert error:', error);
-
-    // If error indicates missing columns, attempt Indonesian column mapping fallback
     if (
       error.message.includes('column') ||
       error.message.includes('schema') ||
@@ -300,26 +434,23 @@ export const insertExcelStudentsToSupabase = async (
       if (!error2) {
         return {
           success: true,
-          message: `BERHASIL! ${indonesianRows.length} data siswa telah disimpan ke Supabase (pemetaan kolom bahasa Indonesia).`,
+          message: `BERHASIL! ${indonesianRows.length} data siswa telah disimpan ke Supabase.`,
           insertedCount: indonesianRows.length,
         };
       }
 
       return {
         success: false,
-        message: `Gagal menyimpan ke Supabase: ${error2.message} (${error2.code ? 'Kode: ' + error2.code : ''})`,
+        message: `Gagal menyimpan ke Supabase: ${error2.message}`,
         errorDetail: error2,
       };
     }
 
-    // Friendly error messages for common issues
     let userMsg = error.message;
     if (error.message.includes('relation "public.students" does not exist') || error.code === '42P01') {
-      userMsg = 'Tabel "students" belum ada di Supabase. Silakan buka menu "Supabase DB" dan jalankan Script SQL Schema terlebih dahulu.';
+      userMsg = 'Tabel "students" belum ada di Supabase. Silakan jalankan Script SQL Schema terlebih dahulu.';
     } else if (error.message.includes('row-level security') || error.code === '42501') {
-      userMsg = 'Row Level Security (RLS) di Supabase memblokir penambahan data. Silakan jalankan policy RLS di menu "Supabase DB" -> Script SQL.';
-    } else if (error.code === '23505') {
-      userMsg = `Terdapat NISN/ID duplikat di Supabase: ${error.details || error.message}`;
+      userMsg = 'Row Level Security (RLS) di Supabase memblokir penambahan data.';
     }
 
     return {

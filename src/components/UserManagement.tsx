@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { UserPlus, Edit2, Trash2, Shield, CheckCircle, XCircle, X, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Edit2, Trash2, Shield, CheckCircle, XCircle, X, Eye, EyeOff, RefreshCw, Loader2 } from 'lucide-react';
+import { fetchUsersFromSupabase, syncUserToSupabase, deleteUserFromSupabase } from '../lib/supabase';
 
 interface UserManagementProps {
   users: User[];
@@ -19,8 +20,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   onToggleUserStatus,
   onDeleteUser,
 }) => {
+  const [localUsers, setLocalUsers] = useState<User[]>(users);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Flag pengunci double submit
 
   // Form State
   const [name, setName] = useState('');
@@ -29,6 +33,22 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'ADMIN' | 'GURU'>('GURU');
   const [status, setStatus] = useState<'aktif' | 'nonaktif'>('aktif');
+
+  // Ambil data terbaru langsung dari Supabase saat halaman dimuat
+  const loadSupabaseUsers = async () => {
+    setLoading(true);
+    const dbUsers = await fetchUsersFromSupabase();
+    if (dbUsers && dbUsers.length > 0) {
+      setLocalUsers(dbUsers);
+    } else {
+      setLocalUsers(users);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadSupabaseUsers();
+  }, []);
 
   const handleOpenEdit = (user: User) => {
     setEditingUser(user);
@@ -52,7 +72,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  // Fungsi Simpan ke Supabase (Terproteksi dari Double Submit)
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); // Mencegah reload halaman & double trigger
+    if (isSubmitting) return; // Kunci jika sedang proses simpan
+
     if (!name.trim()) {
       alert('Nama Lengkap wajib diisi!');
       return;
@@ -62,32 +86,76 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       return;
     }
 
-    if (editingUser) {
-      const updatedUser: User = {
-        ...editingUser,
-        name: name.trim(),
-        username: username.trim(),
-        role,
-        status,
-        password: password.trim() ? password.trim() : editingUser.password,
-      };
+    setIsSubmitting(true);
 
-      if (typeof onEditUser === 'function') {
-        onEditUser(updatedUser);
-      }
-    } else {
-      if (typeof onAddUser === 'function') {
-        onAddUser({
+    try {
+      if (editingUser) {
+        const updatedUser: User = {
+          ...editingUser,
           name: name.trim(),
           username: username.trim(),
+          role,
+          status,
+          password: password.trim() ? password.trim() : editingUser.password,
+        };
+
+        const success = await syncUserToSupabase(updatedUser);
+        if (success && typeof onEditUser === 'function') {
+          onEditUser(updatedUser);
+        }
+      } else {
+        const newUser: User = {
+          id: `usr-${Date.now()}`,
+          name: name.trim(),
+          username: username.trim(),
+          email: `${username.trim()}@sekolah.sch.id`,
           password: password.trim() || 'password',
           role,
           status,
-        });
-      }
-    }
+          createdAt: new Date().toISOString(),
+        };
 
-    setIsModalOpen(false);
+        const success = await syncUserToSupabase(newUser);
+        if (success && typeof onAddUser === 'function') {
+          onAddUser({
+            name: newUser.name,
+            username: newUser.username,
+            password: newUser.password,
+            role: newUser.role,
+            status: newUser.status,
+          });
+        }
+      }
+
+      await loadSupabaseUsers();
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Error saat menyimpan user:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (user: User) => {
+    const updatedUser: User = {
+      ...user,
+      status: user.status === 'aktif' ? 'nonaktif' : 'aktif',
+    };
+    await syncUserToSupabase(updatedUser);
+    if (typeof onToggleUserStatus === 'function') {
+      onToggleUserStatus(user.id);
+    }
+    await loadSupabaseUsers();
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) {
+      await deleteUserFromSupabase(userId);
+      if (typeof onDeleteUser === 'function') {
+        onDeleteUser(userId);
+      }
+      await loadSupabaseUsers();
+    }
   };
 
   return (
@@ -97,16 +165,26 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         <div>
           <h2 className="text-xl font-bold text-slate-800">Manajemen Pengguna</h2>
           <p className="text-xs text-slate-500 mt-1">
-            Kelola akun akses sistem, nama, username, role (Admin/Guru), dan status akun.
+            Kelola akun akses sistem tersambung Supabase: nama, username, role, dan status akun.
           </p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>+ Tambah Pengguna</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={loadSupabaseUsers}
+            disabled={loading}
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
+            title="Muat Ulang Data Supabase"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>+ Tambah Pengguna</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabel Users */}
@@ -123,7 +201,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {users.map((u) => (
+              {localUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/80 transition">
                   <td className="p-4 font-bold text-slate-800">{u.name}</td>
                   <td className="p-4 text-slate-500 font-mono">{u.username}</td>
@@ -137,7 +215,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   </td>
                   <td className="p-4">
                     <button
-                      onClick={() => onToggleUserStatus?.(u.id)}
+                      onClick={() => handleToggleStatus(u)}
                       className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-[10px] font-bold transition ${
                         u.status === 'aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}
@@ -157,7 +235,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                       </button>
                       {u.id !== currentUser.id && (
                         <button
-                          onClick={() => onDeleteUser?.(u.id)}
+                          onClick={() => handleDelete(u.id)}
                           className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           title="Hapus Pengguna"
                         >
@@ -178,7 +256,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100">
             
-            {/* Header Modal */}
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h3 className="font-bold text-slate-800 text-sm">
                 {editingUser ? 'Edit Data Pengguna' : 'Tambah Pengguna Baru'}
@@ -186,47 +263,42 @@ export const UserManagement: React.FC<UserManagementProps> = ({
               <button 
                 type="button"
                 onClick={() => setIsModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-600 transition"
+                disabled={isSubmitting}
+                className="text-slate-400 hover:text-slate-600 transition disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Isi Form */}
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSave();
-              }} 
-              className="p-5 space-y-4"
-            >
+            <form onSubmit={handleSave} className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nama Lengkap & Gelar
                 </label>
                 <input
                   type="text"
+                  required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: sugiyarti atau Siti Rahmawati, M.Pd."
+                  placeholder="Contoh: Siti Rahmawati, M.Pd."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Username / Alamat Email
+                  Username
                 </label>
                 <input
                   type="text"
+                  required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Contoh: admin"
+                  placeholder="Contoh: nurul"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition"
                 />
               </div>
 
-              {/* Input Password + Toggle Mata */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Password Baru {editingUser && '(Kosongkan jika tidak diubah)'}
@@ -278,20 +350,28 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 </select>
               </div>
 
-              {/* Tombol Aksi */}
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-blue-500/20 active:scale-95"
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition shadow-md shadow-blue-500/20 active:scale-95 disabled:opacity-50"
                 >
-                  Simpan Perubahan
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan ke Supabase</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -303,5 +383,4 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   );
 };
 
-// Default Export untuk memastikan kompatibilitas penuh dengan App.tsx
 export default UserManagement;

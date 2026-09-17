@@ -1,295 +1,324 @@
 import React, { useState } from 'react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, ArrowRight, Download, Info } from 'lucide-react';
 import { Student } from '../types';
-import { 
-  FileSpreadsheet, 
-  Upload, 
-  CheckCircle2, 
-  AlertCircle, 
-  Download, 
-  Trash2, 
-  FileText,
-  Users
-} from 'lucide-react';
 
 interface ExcelUploadProps {
-  onCommitImport: (students: Student[]) => void;
-  existingStudents: Student[];
+  onCommitImport?: (importedStudents: Student[]) => void;
+  onImportSuccess?: (importedStudents: Student[]) => void;
+  onImportStudents?: (importedStudents: Student[]) => void;
+  existingStudents?: Student[];
 }
 
 export const ExcelUpload: React.FC<ExcelUploadProps> = ({
   onCommitImport,
-  existingStudents,
+  onImportSuccess,
+  onImportStudents,
 }) => {
-  const [dragActive, setDragActive] = useState(false);
   const [parsedData, setParsedData] = useState<Student[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Manual fallback parser untuk file CSV / Text demi mencegah crash
-  const parseCSVText = (text: string): Student[] => {
-    const lines = text.split(/\r\n|\n/);
-    if (lines.length < 2) return [];
-
-    const results: Student[] = [];
-    // Skip header line
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      const cols = line.split(',').map((c) => c.trim().replace(/^"(.*)"$/, '$1'));
-
-      if (cols.length >= 3) {
-        results.push({
-          id: `imp-${Date.now()}-${i}`,
-          nisn: cols[0] || `00${Math.floor(10000000 + Math.random() * 90000000)}`,
-          nis: cols[1] || `${23241000 + i}`,
-          name: cols[2] || `Siswa ${i}`,
-          gender: (cols[3]?.toUpperCase() === 'P' ? 'P' : 'L') as 'L' | 'P',
-          class: cols[4] || '10 MIPA 1',
-          major: cols[5] || 'MIPA',
-          generation: '2025/2026',
-          entryYear: 2025,
-          status: 'Aktif',
-          birthPlace: cols[6] || 'Jakarta',
-          birthDate: cols[7] || '2008-01-01',
-          address: cols[8] || 'Jl. Pendidikan No. 1',
-          phone: cols[9] || '08123456789',
-          parentName: cols[10] || 'Orang Tua',
-          parentPhone: cols[11] || '08129876543',
-          notes: 'Diimpor dari file Excel/CSV',
-          createdAt: new Date().toISOString(),
-        });
-      }
-    }
-    return results;
-  };
-
-  const handleFileChange = (file: File) => {
-    setError(null);
-    setFileName(file.name);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const parsed = parseCSVText(content);
-        
-        if (parsed.length === 0) {
-          // Generate demo data jika format tidak cocok
-          const mockImported: Student[] = [
-            {
-              id: `imp-${Date.now()}-1`,
-              nisn: '0069876541',
-              nis: '23241099',
-              name: 'Bagus Setiawan (Import)',
-              gender: 'L',
-              class: '10 MIPA 2',
-              major: 'MIPA',
-              generation: '2025/2026',
-              entryYear: 2025,
-              status: 'Aktif',
-              birthPlace: 'Bandung',
-              birthDate: '2008-03-15',
-              address: 'Jl. Melati No. 8',
-              phone: '081399887766',
-              parentName: 'Hendra Setiawan',
-              parentPhone: '081311223344',
-              notes: 'Hasil Impor Excel',
-              createdAt: new Date().toISOString(),
-            },
-            {
-              id: `imp-${Date.now()}-2`,
-              nisn: '0069876542',
-              nis: '23241100',
-              name: 'Citra Kirana (Import)',
-              gender: 'P',
-              class: '10 IPS 1',
-              major: 'IPS',
-              generation: '2025/2026',
-              entryYear: 2025,
-              status: 'Aktif',
-              birthPlace: 'Surabaya',
-              birthDate: '2008-07-22',
-              address: 'Jl. Anggrek No. 12',
-              phone: '081377665544',
-              parentName: 'Wawan Kirana',
-              parentPhone: '081355443322',
-              notes: 'Hasil Impor Excel',
-              createdAt: new Date().toISOString(),
-            },
-          ];
-          setParsedData(mockImported);
-        } else {
-          setParsedData(parsed);
-        }
-      } catch (err) {
-        setError('Gagal membaca file. Pastikan format file sesuai.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
+  // 1. FUNGSI UNDUH TEMPLATE DENGAN KOLOM BIODATA LENGKAP
   const handleDownloadTemplate = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'NISN,NIS,Nama Lengkap,Jenis Kelamin (L/P),Kelas,Jurusan,Tempat Lahir,Tanggal Lahir,Alamat,No HP,Nama Orang Tua,No HP Orang Tua\n' +
-      '0051122334,23241050,Ahmad Fauzi,L,10 MIPA 1,MIPA,Jakarta,2008-01-10,Jl. Sudirman No. 1,08123456781,Budi,08129876541\n' +
-      '0051122335,23241051,Anisa Rahma,P,10 IPS 1,IPS,Bandung,2008-05-14,Jl. Asia Afrika No. 5,08123456782,Sulaeman,08129876542';
+    // Header lengkap sesuai tampilan Biodata & Kontak Aplikasi
+    const headers = [
+      'NISN',
+      'NIS',
+      'NAMA SISWA',
+      'KELAS',
+      'GENDER',
+      'AGAMA',
+      'KEBUTUHAN KHUSUS',
+      'TEMPAT LAHIR',
+      'TANGGAL LAHIR',
+      'NO TELEPON WA',
+      'NAMA ORANG TUA',
+      'ALAMAT LENGKAP',
+      'STATUS'
+    ];
+    
+    // Contoh data siswa dummy dengan biodata lengkap
+    const sampleRows = [
+      ['106590001', '2324101', 'Ahmad Rizky Pratama', '10B', 'L', 'Islam', 'Tidak Ada', 'Banyumas', '2008-05-12', '081234567890', 'Budi Pratama', 'Jl. Merdeka No. 12, Purwokerto', 'Aktif'],
+      ['106590002', '2324102', 'Siti Nurhaliza', '10B', 'P', 'Islam', 'Tunagrahita', 'Sleman', '2008-09-20', '085712345678', 'Rahmat Hidayat', 'Jl. Kaliurang Km 9, Sleman', 'Aktif'],
+      ['106590003', '2324103', 'Adzrul Nuriksan', '12C', 'L', 'Islam', 'Tunagrahita', 'Yogyakarta', '2007-01-15', '089611223344', 'Nurhadi', 'Jl. Magelang No. 45, Yogyakarta', 'Aktif'],
+    ];
 
-    const encodedUri = encodeURI(csvContent);
+    // Gunakan titik koma (;) standar MS Excel Indonesia
+    const csvRows = [
+      headers.join(';'),
+      ...sampleRows.map((row) => row.map((val) => `"${val}"`).join(';')),
+    ];
+
+    // Tambahkan UTF-8 BOM (\uFEFF) agar rapi saat dibuka di MS Excel
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'Template_Data_Siswa_Kesiswaan.csv');
+    link.href = url;
+    link.setAttribute('download', 'Template_Import_Lengkap_Siswa.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper mendeteksi pemisah CSV (Titik Koma ';' vs Koma ',' vs Tab '\t')
+  const detectDelimiter = (text: string): string => {
+    const firstLine = text.split(/\r\n|\n/)[0] || '';
+    if (firstLine.includes(';')) return ';';
+    if (firstLine.includes('\t')) return '\t';
+    return ',';
+  };
+
+  // Helper membersihkan petik dan spasi
+  const cleanValue = (val: string | undefined): string => {
+    if (!val) return '';
+    return val.replace(/^["']|["']$/g, '').trim();
+  };
+
+  // 2. HANDLER UPLOAD & PARSING FILE CSV
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setErrorMsg(null);
+    setIsProcessing(true);
+
+    const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (isXlsx) {
+      setErrorMsg(
+        'Silakan unduh template kami terlebih dahulu atau Save As file Excel Anda menjadi "CSV (Comma delimited) (*.csv)" sebelum diunggah.'
+      );
+      setIsProcessing(false);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        if (!text || text.trim() === '') {
+          setErrorMsg('File kosong atau tidak dapat dibaca.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const lines = text.split(/\r\n|\n/).filter((line) => line.trim() !== '');
+        if (lines.length < 2) {
+          setErrorMsg('File harus memiliki setidaknya 1 baris header dan 1 baris data siswa.');
+          setIsProcessing(false);
+          return;
+        }
+
+        const delimiter = detectDelimiter(lines[0]);
+        const headerCols = lines[0].split(delimiter).map((h) => cleanValue(h).toUpperCase());
+
+        // Deteksi Otomatis Indeks Kolom Header
+        let nameIdx = headerCols.findIndex((h) => h.includes('NAMA SISWA') || h.includes('NAMA'));
+        let nisnIdx = headerCols.findIndex((h) => h.includes('NISN'));
+        let nisIdx = headerCols.findIndex((h) => h.includes('NIS') && !h.includes('NISN'));
+        let classIdx = headerCols.findIndex((h) => h.includes('KELAS') || h.includes('CLASS'));
+        let genderIdx = headerCols.findIndex((h) => 
+          h.includes('GENDER') || h.includes('JK') || h.includes('KELAMIN') || h.includes('P/L') || h.includes('L/P')
+        );
+        let religionIdx = headerCols.findIndex((h) => h.includes('AGAMA'));
+        let needsIdx = headerCols.findIndex((h) => h.includes('KHUSUS') || h.includes('KEBUTUHAN'));
+        
+        // Indeks Biodata Baru
+        let pobIdx = headerCols.findIndex((h) => h.includes('TEMPAT') || h.includes('POB'));
+        let dobIdx = headerCols.findIndex((h) => h.includes('TANGGAL') || h.includes('TGL') || h.includes('DOB'));
+        let phoneIdx = headerCols.findIndex((h) => h.includes('TELEPON') || h.includes('HP') || h.includes('WA') || h.includes('TELP'));
+        let parentIdx = headerCols.findIndex((h) => h.includes('ORANG TUA') || h.includes('WALI') || h.includes('ORTU'));
+        let addressIdx = headerCols.findIndex((h) => h.includes('ALAMAT') || h.includes('ADDRESS'));
+
+        // Fallback jika nama header tidak terdeteksi
+        if (nameIdx === -1) {
+          const firstDataLine = lines[1].split(delimiter).map(cleanValue);
+          nameIdx = firstDataLine.findIndex((val) => isNaN(Number(val)) && val.length > 2);
+          if (nameIdx === -1) nameIdx = 2;
+        }
+
+        const dataRows = lines.slice(1);
+        const importedStudents: Student[] = [];
+
+        dataRows.forEach((row, idx) => {
+          const cols = row.split(delimiter).map(cleanValue);
+          
+          const rawName = cols[nameIdx];
+          if (!rawName || rawName.trim() === '') return;
+
+          const genderRaw = (cols[genderIdx] || 'L').toUpperCase();
+          const genderNormalized: 'L' | 'P' = genderRaw.startsWith('P') || genderRaw.includes('PEREMPUAN') ? 'P' : 'L';
+
+          importedStudents.push({
+            id: `imported-${Date.now()}-${idx}`,
+            nisn: cols[nisnIdx] || `${106590000 + idx}`,
+            nis: cols[nisIdx] || `${2324100 + idx}`,
+            name: rawName,
+            gender: genderNormalized,
+            class: cols[classIdx] || '10B',
+            major: 'Tunagrahita',
+            religion: cols[religionIdx] || 'Islam',
+            specialNeeds: cols[needsIdx] || 'Tidak Ada',
+            
+            // MAP DATA BIODATA & KONTAK BARU
+            birthPlace: pobIdx !== -1 && cols[pobIdx] ? cols[pobIdx] : '-',
+            birthDate: dobIdx !== -1 && cols[dobIdx] ? cols[dobIdx] : '-',
+            phone: phoneIdx !== -1 && cols[phoneIdx] ? cols[phoneIdx] : '-',
+            parentName: parentIdx !== -1 && cols[parentIdx] ? cols[parentIdx] : '-',
+            address: addressIdx !== -1 && cols[addressIdx] ? cols[addressIdx] : '-',
+
+            generation: '2025/2026',
+            entryYear: 2025,
+            status: 'Aktif',
+            createdAt: new Date().toISOString(),
+          });
+        });
+
+        if (importedStudents.length === 0) {
+          setErrorMsg('Gagal membaca data siswa. Gunakan template resmi yang dapat diunduh di atas.');
+        } else {
+          setParsedData(importedStudents);
+        }
+      } catch (err) {
+        setErrorMsg('Terjadi kesalahan saat memproses file CSV.');
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  // 3. HANDLER SIMPAN KE UTAMA
+  const handleCommit = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (parsedData.length === 0) {
+      setErrorMsg('Belum ada data siswa yang siap diimpor.');
+      return;
+    }
+
+    if (onCommitImport) onCommitImport(parsedData);
+    else if (onImportSuccess) onImportSuccess(parsedData);
+    else if (onImportStudents) onImportStudents(parsedData);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 font-sans space-y-6">
+      
+      {/* Header & Unduh Template Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
-            <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-            <span>Upload & Import Data Siswa Excel</span>
+          <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+            Upload & Import Data Siswa Lengkap
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Unggah file .xlsx atau .csv untuk menambahkan data siswa secara masal ke dalam database kesiswaan.
+            Unduh template CSV lengkap di samping untuk memasukkan Nama, Orang Tua, No. WA, dan Alamat sekaligus.
           </p>
         </div>
+
+        {/* Tombol Unduh Template */}
         <button
+          type="button"
           onClick={handleDownloadTemplate}
-          className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-300 transition flex items-center space-x-2 shrink-0 cursor-pointer"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
         >
-          <Download className="w-4 h-4 text-slate-600" />
-          <span>Unduh Template Format</span>
+          <Download className="w-4 h-4 text-emerald-600" />
+          <span>Unduh Template CSV Lengkap</span>
         </button>
       </div>
 
-      {/* Upload Drag and Drop Area */}
-      <div
-        className={`bg-white rounded-2xl border-2 border-dashed p-8 text-center transition ${
-          dragActive ? 'border-blue-500 bg-blue-50/50' : 'border-slate-300 hover:border-slate-400'
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFileChange(e.dataTransfer.files[0]);
-          }
-        }}
-      >
-        <div className="max-w-md mx-auto space-y-3">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl border border-blue-100 flex items-center justify-center text-blue-600 mx-auto">
-            <Upload className="w-8 h-8" />
-          </div>
-          <div>
-            <p className="text-sm font-black text-slate-800">Tarik & Lepas File Excel / CSV Di Sini</p>
-            <p className="text-xs text-slate-400 mt-0.5">Mendukung format file .xlsx, .xls, dan .csv</p>
-          </div>
-          <div>
-            <label className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md transition cursor-pointer inline-flex items-center space-x-2">
-              <FileText className="w-4 h-4" />
-              <span>Pilih File Dari Komputer</span>
-              <input
-                type="file"
-                accept=".xlsx, .xls, .csv"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleFileChange(e.target.files[0]);
-                  }
-                }}
-              />
-            </label>
-          </div>
+      {/* Info Petunjuk */}
+      <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-2xl flex items-start gap-3 text-xs text-blue-800">
+        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-bold">Panduan Impor Data Biodata Siswa:</p>
+          <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
+            <li>Klik tombol <strong>"Unduh Template CSV Lengkap"</strong>.</li>
+            <li>Buka file di Microsoft Excel, lalu isi data orang tua, nomor WA, dan alamat siswa.</li>
+            <li>Simpan (Save) dan unggah kembali file CSV tersebut di bawah.</li>
+          </ol>
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>{error}</span>
+      {/* Area Upload File */}
+      <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-blue-500 transition-colors bg-slate-50/50">
+        <input
+          type="file"
+          id="excel-file-input"
+          accept=".csv, .xlsx, .xls"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <label htmlFor="excel-file-input" className="cursor-pointer flex flex-col items-center">
+          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mb-3">
+            <Upload className="w-6 h-6" />
+          </div>
+          <span className="text-sm font-bold text-slate-700">
+            {fileName ? fileName : 'Klik di sini untuk memilih File CSV / Excel'}
+          </span>
+          <span className="text-xs text-slate-400 mt-1">
+            Format yang didukung: <strong>File CSV (.csv)</strong>
+          </span>
+        </label>
+      </div>
+
+      {errorMsg && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold rounded-2xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold">Pemberitahuan:</p>
+            <p>{errorMsg}</p>
+          </div>
         </div>
       )}
 
-      {/* Preview Table Section */}
+      {/* Preview Data Terbaca */}
       {parsedData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-            <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
-                <Users className="w-5 h-5 text-emerald-600" />
-                <span>Pratinjau Data Impor ({parsedData.length} Siswa)</span>
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                File: <span className="font-bold text-slate-700">{fileName}</span>
-              </p>
+        <div className="space-y-4 pt-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Berhasil membaca {parsedData.length} data siswa beserta biodata & kontak</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {
-                  setParsedData([]);
-                  setFileName(null);
-                }}
-                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Batal</span>
-              </button>
-              <button
-                onClick={() => onCommitImport(parsedData)}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition flex items-center space-x-1.5 cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Simpan Ke Database ({parsedData.length})</span>
-              </button>
-            </div>
+
+            <button
+              type="button"
+              onClick={handleCommit}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <span>Simpan & Masukkan {parsedData.length} Siswa Baru</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase font-extrabold">
-                  <th className="p-3">#</th>
-                  <th className="p-3">NISN / NIS</th>
-                  <th className="p-3">Nama Siswa</th>
-                  <th className="p-3">JK</th>
-                  <th className="p-3">Kelas / Jurusan</th>
-                  <th className="p-3">Tempat, Tgl Lahir</th>
-                  <th className="p-3">No. HP</th>
+          <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                <tr>
+                  <th className="p-3">NO</th>
+                  <th className="p-3">NAMA SISWA</th>
+                  <th className="p-3">ORANG TUA / WALI</th>
+                  <th className="p-3">NO. TELEPON/WA</th>
+                  <th className="p-3">ALAMAT</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {parsedData.map((std, idx) => (
-                  <tr key={std.id} className="hover:bg-slate-50 transition">
-                    <td className="p-3 font-bold text-slate-400">{idx + 1}</td>
-                    <td className="p-3 font-mono font-bold text-slate-700">
-                      {std.nisn} <br />
-                      <span className="text-[10px] text-slate-400">{std.nis}</span>
-                    </td>
-                    <td className="p-3 font-black text-slate-900">{std.name}</td>
-                    <td className="p-3 font-bold">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                          std.gender === 'L' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
-                        }`}
-                      >
-                        {std.gender}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-slate-700">
-                      {std.class} ({std.major})
-                    </td>
-                    <td className="p-3 text-slate-500">
-                      {std.birthPlace}, {std.birthDate}
-                    </td>
-                    <td className="p-3 font-mono text-slate-600">{std.phone}</td>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {parsedData.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="p-3 font-medium text-slate-400">{idx + 1}</td>
+                    <td className="p-3 font-bold text-slate-900">{item.name}</td>
+                    <td className="p-3">{item.parentName || '-'}</td>
+                    <td className="p-3 font-mono">{item.phone || '-'}</td>
+                    <td className="p-3 truncate max-w-[200px]">{item.address || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -300,3 +329,5 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
     </div>
   );
 };
+
+export default ExcelUpload;

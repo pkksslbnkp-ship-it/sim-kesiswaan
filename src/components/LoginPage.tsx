@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { User as UserIcon, Lock, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { User as UserIcon, Lock, ShieldCheck, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { fetchUsersFromSupabase } from '../lib/supabase';
 
 interface LoginPageProps {
   allUsers: User[];
@@ -10,10 +11,11 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // State Toggle Mata
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -26,25 +28,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }
       return;
     }
 
-    // Cari user berdasarkan Username/Email & Password
-    const foundUser = allUsers.find(
-      (u) =>
-        (u.username.toLowerCase() === username.trim().toLowerCase() ||
-         u.name.toLowerCase() === username.trim().toLowerCase()) &&
-        u.password === password
-    );
+    setLoading(true);
 
-    if (!foundUser) {
-      setError('Username atau Password yang Anda masukkan salah!');
-      return;
+    try {
+      // 1. Coba ambil user langsung dari Supabase Database
+      let usersList = await fetchUsersFromSupabase();
+
+      // Fallback ke local state/props jika Supabase kosong/belum terhubung
+      if (!usersList || usersList.length === 0) {
+        usersList = allUsers;
+      }
+
+      // 2. Cari user berdasarkan username / email / name & password
+      const input = username.trim().toLowerCase();
+      const foundUser = usersList.find(
+        (u) =>
+          (u.username.toLowerCase() === input ||
+           u.email?.toLowerCase() === input ||
+           u.name.toLowerCase() === input) &&
+          u.password === password
+      );
+
+      if (!foundUser) {
+        setError('Username atau Password yang Anda masukkan salah!');
+        setLoading(false);
+        return;
+      }
+
+      if (foundUser.status === 'nonaktif') {
+        setError('Akun Anda dinonaktifkan. Silakan hubungi Administrator.');
+        setLoading(false);
+        return;
+      }
+
+      onLoginSuccess(foundUser);
+    } catch (err: any) {
+      setError('Terjadi kesalahan saat mencoba login.');
+    } finally {
+      setLoading(false);
     }
-
-    if (foundUser.status === 'nonaktif') {
-      setError('Akun Anda dinonaktifkan. Silakan hubungi Administrator.');
-      return;
-    }
-
-    onLoginSuccess(foundUser);
   };
 
   return (
@@ -76,7 +98,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }
           {/* Input Username */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Username
+              Username / Email
             </label>
             <div className="relative">
               <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
@@ -84,14 +106,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="guru@sekolah.sch.id"
+                placeholder="admin / guru"
                 required
+                disabled={loading}
                 className="w-full pl-10 pr-4 py-2.5 bg-blue-50/50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none transition"
               />
             </div>
           </div>
 
-          {/* Input Password + Ikon Mata (Toggle Visibility) */}
+          {/* Input Password */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Password
@@ -104,6 +127,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                disabled={loading}
                 className="w-full pl-10 pr-10 py-2.5 bg-blue-50/50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none transition"
               />
               <button
@@ -125,9 +149,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ allUsers, onLoginSuccess }
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition shadow-md shadow-blue-500/25 active:scale-[0.98]"
+              disabled={loading}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition shadow-md shadow-blue-500/25 active:scale-[0.98] flex items-center justify-center space-x-2"
             >
-              Masuk ke Sistem
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Memeriksa Akun...</span>
+                </>
+              ) : (
+                <span>Masuk ke Sistem</span>
+              )}
             </button>
           </div>
 

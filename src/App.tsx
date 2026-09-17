@@ -9,6 +9,15 @@ import {
   getCurrentUser, setCurrentUser, 
   resetDataToDefault 
 } from './lib/storage';
+import { 
+  getSupabaseClient, 
+  fetchStudentsFromSupabase, 
+  syncStudentsToSupabase,
+  fetchUsersFromSupabase,
+  syncUsersToSupabase,
+  syncUserToSupabase,
+  deleteUserFromSupabase
+} from './lib/supabase';
 
 import { Header } from './components/Header';
 import { Sidebar, TabType } from './components/Sidebar';
@@ -40,7 +49,7 @@ export default function App() {
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
-  // Status Login
+  // Status Login State
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     try {
       const auth = localStorage.getItem('sim_kesiswaan_is_logged_in_v1');
@@ -53,7 +62,10 @@ export default function App() {
   // State Utama
   const [currentUser, setCurrentUserRule] = useState<User>(getCurrentUser());
   const [users, setUsers] = useState<User[]>(getStoredUsers());
-  const [students, setStudents] = useState<Student[]>(getStoredStudents());
+  const [students, setStudents] = useState<Student[]>(() => {
+    const loaded = getStoredStudents();
+    return loaded && loaded.length > 0 ? loaded : [];
+  });
   const [achievements, setAchievements] = useState<Achievement[]>(getStoredAchievements());
   const [alumni, setAlumni] = useState<Alumni[]>(getStoredAlumni());
   const [logs, setLogs] = useState<ActivityLog[]>(getStoredLogs());
@@ -77,6 +89,46 @@ export default function App() {
     message: '',
     onConfirm: () => {},
   });
+
+  // HELPER SYNC CLOUD AUTOMATIC
+  const syncToCloud = async (studentsList: Student[]) => {
+    try {
+      await syncStudentsToSupabase(studentsList);
+    } catch (e) {
+      console.warn('Gagal sync data siswa ke Cloud Supabase:', e);
+    }
+  };
+
+  const syncUsersToCloud = async (usersList: User[]) => {
+    try {
+      await syncUsersToSupabase(usersList);
+    } catch (e) {
+      console.warn('Gagal sync data users ke Cloud Supabase:', e);
+    }
+  };
+
+  // OTOMATIS TARIK DATA DARI SUPABASE SAAT APLIKASI DIBUKA
+  useEffect(() => {
+    const fetchCloudData = async () => {
+      try {
+        const cloudStudents = await fetchStudentsFromSupabase();
+        if (cloudStudents && cloudStudents.length > 0) {
+          setStudents(cloudStudents);
+          setStoredStudents(cloudStudents);
+        }
+
+        const cloudUsers = await fetchUsersFromSupabase();
+        if (cloudUsers && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+          setStoredUsers(cloudUsers);
+        }
+      } catch (err) {
+        console.log('Tidak dapat membaca Cloud Supabase, menggunakan data lokal.');
+      }
+    };
+
+    fetchCloudData();
+  }, []);
 
   const askConfirmation = (config: {
     title: string;
@@ -111,6 +163,45 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
+  const handleCommitImport = (importedStudents: Student[]) => {
+    if (!importedStudents || importedStudents.length === 0) {
+      alert('Tidak ada data siswa yang diimpor.');
+      return;
+    }
+
+    setStudents((prevStudents) => {
+      const formattedImport = importedStudents.map((s, idx) => ({
+        ...s,
+        id: s.id || `imported-${Date.now()}-${idx}`,
+        gender: (s.gender ? String(s.gender).toUpperCase() : 'L') as 'L' | 'P',
+        religion: s.religion || 'Islam',
+        specialNeeds: s.specialNeeds || 'Tidak Ada',
+        status: s.status || 'Aktif',
+        class: s.class || '10B',
+      }));
+
+      const existingNisns = new Set(prevStudents.map((s) => s.nisn).filter(Boolean));
+      const freshOnly = formattedImport.filter((s) => !s.nisn || !existingNisns.has(s.nisn));
+
+      const updatedList = [...freshOnly, ...prevStudents];
+
+      setStoredStudents(updatedList);
+      syncToCloud(updatedList);
+
+      return updatedList;
+    });
+
+    addActivityLog(
+      currentUser.name,
+      currentUser.role,
+      'IMPORT_EXCEL',
+      `Berhasil mengimpor ${importedStudents.length} data siswa baru.`
+    );
+    setLogs(getStoredLogs());
+
+    setActiveTab('students');
+  };
+
   const handleLoginSuccess = (user: User) => {
     setCurrentUserRule(user);
     setCurrentUser(user);
@@ -129,6 +220,11 @@ export default function App() {
   const handleSwitchUser = (user: User) => {
     setCurrentUserRule(user);
     setCurrentUser(user);
+    
+    if (user.role !== 'ADMIN' && activeTab === 'users') {
+      setActiveTab('dashboard');
+    }
+
     addActivityLog(user.name, user.role, 'SWITCH_USER', `Beralih peran sebagai ${user.name}`);
     setLogs(getStoredLogs());
   };
@@ -153,8 +249,12 @@ export default function App() {
 
   const handleSaveStudent = (data: Partial<Student>) => {
     if (editingStudent) {
-      const updated = students.map((s) => (s.id === editingStudent.id ? ({ ...s, ...data } as Student) : s));
-      setStudents(updated);
+      setStudents((prev) => {
+        const updated = prev.map((s) => (s.id === editingStudent.id ? ({ ...s, ...data } as Student) : s));
+        setStoredStudents(updated);
+        syncToCloud(updated);
+        return updated;
+      });
       addActivityLog(currentUser.name, currentUser.role, 'UPDATE_STUDENT', `Memperbarui data siswa: ${data.name}`);
     } else {
       const newStudent: Student = {
@@ -162,9 +262,11 @@ export default function App() {
         nisn: data.nisn || `00${Date.now()}`,
         nis: data.nis || `${23241000 + students.length}`,
         name: data.name || 'Siswa Baru',
-        gender: data.gender || 'L',
-        class: data.class || '10 MIPA 1',
-        major: data.major || 'MIPA',
+        gender: (data.gender ? String(data.gender).toUpperCase() : 'L') as 'L' | 'P',
+        class: data.class || '10B',
+        major: data.major || 'Tunagrahita',
+        religion: data.religion || 'Islam',
+        specialNeeds: data.specialNeeds || 'Tidak Ada',
         generation: data.generation || '2025/2026',
         entryYear: data.entryYear || 2025,
         status: data.status || 'Aktif',
@@ -177,7 +279,12 @@ export default function App() {
         notes: data.notes || '',
         createdAt: new Date().toISOString(),
       };
-      setStudents([newStudent, ...students]);
+      setStudents((prev) => {
+        const updated = [newStudent, ...prev];
+        setStoredStudents(updated);
+        syncToCloud(updated);
+        return updated;
+      });
       addActivityLog(currentUser.name, currentUser.role, 'ADD_STUDENT', `Menambahkan siswa baru: ${newStudent.name}`);
     }
     setEditingStudent(null);
@@ -193,7 +300,12 @@ export default function App() {
       confirmText: 'Hapus Siswa',
       variant: 'danger',
       onConfirm: () => {
-        setStudents((prev) => prev.filter((s) => s.id !== id));
+        setStudents((prev) => {
+          const updated = prev.filter((s) => s.id !== id);
+          setStoredStudents(updated);
+          syncToCloud(updated);
+          return updated;
+        });
         addActivityLog(currentUser.name, currentUser.role, 'DELETE_STUDENT', `Menghapus data siswa: ${targetName}`);
         setLogs(getStoredLogs());
       },
@@ -207,10 +319,12 @@ export default function App() {
       confirmText: 'Luluskan Siswa',
       variant: 'info',
       onConfirm: () => {
-        const updatedStudents = students.map((s) =>
-          s.id === student.id ? { ...s, status: 'Lulus' as const } : s
-        );
-        setStudents(updatedStudents);
+        setStudents((prev) => {
+          const updated = prev.map((s) => (s.id === student.id ? { ...s, status: 'Lulus' as const } : s));
+          setStoredStudents(updated);
+          syncToCloud(updated);
+          return updated;
+        });
 
         const newAlumniRecord: Alumni = {
           id: `alm-${Date.now()}`,
@@ -234,21 +348,50 @@ export default function App() {
     });
   };
 
-  // Handler Edit Pengguna (Menghubungkan Edit ke State Users & State Active Profile)
-  const handleEditUser = (updatedUser: User) => {
-    const updatedUsers = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
-    setUsers(updatedUsers);
+  const handleMutateStudent = (student: Student) => {
+    askConfirmation({
+      title: 'Mutasikan Siswa',
+      message: `Apakah Anda yakin ingin mengubah status siswa "${student.name}" menjadi Mutasi (Pindah Sekolah)?`,
+      confirmText: 'Proses Mutasi',
+      variant: 'warning',
+      onConfirm: () => {
+        setStudents((prev) => {
+          const updated = prev.map((s) => 
+            s.id === student.id ? { ...s, status: 'Mutasi' as const } : s
+          );
+          setStoredStudents(updated);
+          syncToCloud(updated);
+          return updated;
+        });
 
-    if (currentUser.id === updatedUser.id) {
-      setCurrentUserRule(updatedUser);
-      setCurrentUser(updatedUser);
-    }
-
-    addActivityLog(currentUser.name, currentUser.role, 'UPDATE_USER', `Memperbarui data pengguna: ${updatedUser.name}`);
-    setLogs(getStoredLogs());
+        addActivityLog(
+          currentUser.name,
+          currentUser.role,
+          'MUTATE_STUDENT',
+          `Memindahkan status siswa "${student.name}" ke Mutasi`
+        );
+        setLogs(getStoredLogs());
+      },
+    });
   };
 
-  // JIKA BELUM LOGIN -> TAMPILKAN LOGIN PAGE
+  const handleEditUser = async (updatedUser: User) => {
+    const isSuccess = await syncUserToSupabase(updatedUser);
+    if (isSuccess) {
+      const updatedUsers = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
+      setUsers(updatedUsers);
+      setStoredUsers(updatedUsers);
+
+      if (currentUser.id === updatedUser.id) {
+        setCurrentUserRule(updatedUser);
+        setCurrentUser(updatedUser);
+      }
+
+      addActivityLog(currentUser.name, currentUser.role, 'UPDATE_USER', `Memperbarui data pengguna: ${updatedUser.name}`);
+      setLogs(getStoredLogs());
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <LoginPage
@@ -258,11 +401,8 @@ export default function App() {
     );
   }
 
-  // JIKA SUDAH LOGIN -> TAMPILKAN APLIKASI DENGAN SIDEBAR
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
-      {/* Top Header */}
       <Header
         currentUser={currentUser}
         allUsers={users}
@@ -275,26 +415,22 @@ export default function App() {
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
 
-      {/* Main Layout dengan Sidebar */}
-      <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row">
-        
-        {/* Sidebar Navigasi */}
+      <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row gap-6 p-4 sm:p-6 lg:p-8">
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           userRole={currentUser.role}
           schoolLogo={schoolLogo}
           counts={{
-            students: students.length,
+            students: students.filter((s) => s.status === 'Aktif' || !s.status).length,
+            mutasi: students.filter((s) => s.status === 'Mutasi').length,
             achievements: achievements.length,
             alumni: alumni.length,
             users: users.length,
           }}
         />
 
-        {/* Konten Halaman Aktif */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          
+        <main className="flex-1 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <Dashboard
               students={students}
@@ -303,14 +439,14 @@ export default function App() {
               logs={logs}
               userRole={currentUser.role}
               schoolLogo={schoolLogo}
-              onNavigate={(tab) => setActiveTab(tab)}
+              onNavigate={(tab) => setActiveTab(tab as TabType)}
             />
           )}
 
           {activeTab === 'students' && (
             <StudentList
-              students={students}
-              userRole={currentUser.role}
+              students={students.filter((s) => s.status === 'Aktif' || !s.status)}
+              userRole={currentUser.role as 'ADMIN' | 'GURU'}
               schoolLogo={schoolLogo}
               onAddStudent={() => {
                 setEditingStudent(null);
@@ -326,16 +462,40 @@ export default function App() {
                 setIsDetailModalOpen(true);
               }}
               onGraduateStudent={handleGraduateStudent}
+              onMutateStudent={handleMutateStudent}
+              onNavigateToImport={() => setActiveTab('excel-upload')}
+            />
+          )}
+
+          {activeTab === 'mutasi' && (
+            <StudentList
+              students={students.filter((s) => s.status === 'Mutasi')}
+              userRole={currentUser.role as 'ADMIN' | 'GURU'}
+              schoolLogo={schoolLogo}
+              onAddStudent={() => {
+                setEditingStudent(null);
+                setIsStudentModalOpen(true);
+              }}
+              onEditStudent={(std) => {
+                setEditingStudent(std);
+                setIsStudentModalOpen(true);
+              }}
+              onDeleteStudent={handleDeleteStudent}
+              onViewStudentDetail={(std) => {
+                setSelectedStudentDetail(std);
+                setIsDetailModalOpen(true);
+              }}
+              onGraduateStudent={handleGraduateStudent}
+              onMutateStudent={handleMutateStudent}
               onNavigateToImport={() => setActiveTab('excel-upload')}
             />
           )}
 
           {activeTab === 'excel-upload' && (
             <ExcelUpload
-              onCommitImport={(imported) => {
-                setStudents((prev) => [...imported, ...prev]);
-                setActiveTab('students');
-              }}
+              onCommitImport={handleCommitImport}
+              onImportSuccess={handleCommitImport}
+              onImportStudents={handleCommitImport}
               existingStudents={students}
             />
           )}
@@ -365,24 +525,78 @@ export default function App() {
             />
           )}
 
+          {/* Halaman Manajemen Pengguna */}
           {activeTab === 'users' && (
-            <UserManagement
-              users={users}
-              currentUser={currentUser}
-              onAddUser={(newUserData) => {
-                const newUser: User = { ...newUserData, id: `usr-${Date.now()}`, createdAt: new Date().toISOString() };
-                setUsers([...users, newUser]);
-              }}
-              onEditUser={handleEditUser}
-              onToggleUserStatus={(userId) => {
-                setUsers(users.map((u) => u.id === userId ? { ...u, status: u.status === 'aktif' ? 'nonaktif' : 'aktif' } : u));
-              }}
-              onDeleteUser={(userId) => setUsers(users.filter((u) => u.id !== userId))}
-            />
+            currentUser.role === 'ADMIN' ? (
+              <UserManagement
+                users={users}
+                currentUser={currentUser}
+                onAddUser={async (newUserData) => {
+                  const newUser: User = { 
+                    ...newUserData, 
+                    id: `usr-${Date.now()}`, 
+                    createdAt: new Date().toISOString() 
+                  };
+
+                  // 1. Kirim data ke Supabase terlebih dahulu
+                  const isSuccess = await syncUserToSupabase(newUser);
+
+                  // 2. Hanya update State & LocalStorage jika Supabase berhasil menyimpan
+                  if (isSuccess) {
+                    const updatedUsers = [...users, newUser];
+                    setUsers(updatedUsers);
+                    setStoredUsers(updatedUsers);
+
+                    addActivityLog(currentUser.name, currentUser.role, 'ADD_USER', `Menambahkan pengguna baru: ${newUser.name}`);
+                    setLogs(getStoredLogs());
+                  }
+                }}
+                onEditUser={handleEditUser}
+                onToggleUserStatus={async (userId) => {
+                  const targetUser = users.find((u) => u.id === userId);
+                  if (!targetUser) return;
+
+                  const updatedUser = { 
+                    ...targetUser, 
+                    status: (targetUser.status === 'aktif' ? 'nonaktif' : 'aktif') as 'aktif' | 'nonaktif' 
+                  };
+
+                  const isSuccess = await syncUserToSupabase(updatedUser);
+                  if (isSuccess) {
+                    const updatedUsers = users.map((u) => u.id === userId ? updatedUser : u);
+                    setUsers(updatedUsers);
+                    setStoredUsers(updatedUsers);
+                  }
+                }}
+                onDeleteUser={async (userId) => {
+                  const isSuccess = await deleteUserFromSupabase(userId);
+                  if (isSuccess || true) {
+                    const updatedUsers = users.filter((u) => u.id !== userId);
+                    setUsers(updatedUsers);
+                    setStoredUsers(updatedUsers);
+                  }
+                }}
+              />
+            ) : (
+              <div className="p-8 text-center bg-white rounded-2xl shadow-sm border border-slate-100 my-4">
+                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+                  🚫
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Akses Ditolak</h3>
+                <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
+                  Halaman Manajemen Pengguna hanya dapat diakses oleh akun dengan peran <strong>Admin (Waka Kesiswaan)</strong>.
+                </p>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="mt-5 px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20"
+                >
+                  Kembali ke Dashboard
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'technical-doc' && <TechnicalDoc />}
-
         </main>
       </div>
 
@@ -402,7 +616,11 @@ export default function App() {
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
         students={students}
-        onStudentsUpdated={(newStudents) => setStudents(newStudents)}
+        onStudentsUpdated={(newStudents) => {
+          setStudents(newStudents);
+          setStoredStudents(newStudents);
+          syncToCloud(newStudents);
+        }}
       />
 
       <StudentModal
@@ -430,7 +648,7 @@ export default function App() {
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
 
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="font-bold">
             SIM-KESISWAAN © {new Date().getFullYear()} • Sistem Manajemen Data Kesiswaan
@@ -443,7 +661,6 @@ export default function App() {
           </button>
         </div>
       </footer>
-
     </div>
   );
 }

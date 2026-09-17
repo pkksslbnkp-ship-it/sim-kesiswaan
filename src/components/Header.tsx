@@ -128,34 +128,40 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   </div>
 
-                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Ganti Peran (Demo)
-                  </div>
-                  {allUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        onSwitchUser(u);
-                        setIsProfileOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 transition ${
-                        u.id === currentUser.id ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'
-                      }`}
-                    >
-                      <span className="truncate">{u.name}</span>
-                      <span className="text-[10px] text-slate-400 uppercase ml-2">{u.role}</span>
-                    </button>
-                  ))}
+                  {/* RESTRIKSI KEAMANAN: Opsi Ganti Peran Hanya Tampil untuk ADMIN */}
+                  {currentUser.role === 'ADMIN' && (
+                    <>
+                      <div className="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Ganti Peran (Demo Admin)
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {allUsers.map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => {
+                              onSwitchUser(u);
+                              setIsProfileOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-1.5 text-xs flex items-center justify-between hover:bg-slate-100 transition ${
+                              u.id === currentUser.id ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{u.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase ml-2">{u.role}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-slate-100 my-1"></div>
+                    </>
+                  )}
 
-                  <div className="border-t border-slate-100 mt-1 pt-1">
-                    <button
-                      onClick={handleLogoutClick}
-                      className="w-full text-left px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 font-semibold flex items-center space-x-2 transition"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Keluar (Logout)</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleLogoutClick}
+                    className="w-full text-left px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 font-semibold flex items-center space-x-2 transition"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Keluar (Logout)</span>
+                  </button>
                 </div>
               )}
             </div>
