@@ -1,23 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Student, Achievement, Alumni, ActivityLog } from './types';
-import { 
-  getStoredStudents, setStoredStudents, 
-  getStoredUsers, setStoredUsers, 
-  getStoredAchievements, setStoredAchievements, 
-  getStoredAlumni, setStoredAlumni, 
-  getStoredLogs, addActivityLog, 
-  getCurrentUser, setCurrentUser, 
-  resetDataToDefault 
-} from './lib/storage';
-import { 
-  getSupabaseClient, 
-  fetchStudentsFromSupabase, 
-  syncStudentsToSupabase,
-  fetchUsersFromSupabase,
-  syncUsersToSupabase,
-  syncUserToSupabase,
-  deleteUserFromSupabase
-} from './lib/supabase';
+import { getCurrentUser, setCurrentUser } from './lib/storage';
+import { supabase } from './lib/supabaseConfig';
 
 import { Header } from './components/Header';
 import { Sidebar, TabType } from './components/Sidebar';
@@ -37,19 +21,12 @@ import { ConfirmModal } from './components/ConfirmModal';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-
-  const [schoolLogo, setSchoolLogo] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('sim_kesiswaan_school_logo');
-    } catch {
-      return null;
-    }
-  });
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(() => localStorage.getItem('sim_kesiswaan_school_logo'));
 
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
-  // Status Login State
+  // Status Login
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     try {
       const auth = localStorage.getItem('sim_kesiswaan_is_logged_in_v1');
@@ -59,16 +36,13 @@ export default function App() {
     }
   });
 
-  // State Utama
+  // State Utama Murni Terhubung Supabase
   const [currentUser, setCurrentUserRule] = useState<User>(getCurrentUser());
-  const [users, setUsers] = useState<User[]>(getStoredUsers());
-  const [students, setStudents] = useState<Student[]>(() => {
-    const loaded = getStoredStudents();
-    return loaded && loaded.length > 0 ? loaded : [];
-  });
-  const [achievements, setAchievements] = useState<Achievement[]>(getStoredAchievements());
-  const [alumni, setAlumni] = useState<Alumni[]>(getStoredAlumni());
-  const [logs, setLogs] = useState<ActivityLog[]>(getStoredLogs());
+  const [users, setUsers] = useState<User[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [alumni, setAlumni] = useState<Alumni[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
 
   // Modal State
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -90,45 +64,64 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  // HELPER SYNC CLOUD AUTOMATIC
-  const syncToCloud = async (studentsList: Student[]) => {
+  // 1. FETCH DATA UTAMA DARI SUPABASE
+  const fetchAllDataFromSupabase = async () => {
     try {
-      await syncStudentsToSupabase(studentsList);
-    } catch (e) {
-      console.warn('Gagal sync data siswa ke Cloud Supabase:', e);
-    }
-  };
-
-  const syncUsersToCloud = async (usersList: User[]) => {
-    try {
-      await syncUsersToSupabase(usersList);
-    } catch (e) {
-      console.warn('Gagal sync data users ke Cloud Supabase:', e);
-    }
-  };
-
-  // OTOMATIS TARIK DATA DARI SUPABASE SAAT APLIKASI DIBUKA
-  useEffect(() => {
-    const fetchCloudData = async () => {
-      try {
-        const cloudStudents = await fetchStudentsFromSupabase();
-        if (cloudStudents && cloudStudents.length > 0) {
-          setStudents(cloudStudents);
-          setStoredStudents(cloudStudents);
-        }
-
-        const cloudUsers = await fetchUsersFromSupabase();
-        if (cloudUsers && cloudUsers.length > 0) {
-          setUsers(cloudUsers);
-          setStoredUsers(cloudUsers);
-        }
-      } catch (err) {
-        console.log('Tidak dapat membaca Cloud Supabase, menggunakan data lokal.');
+      // Fetch Students
+      const { data: studentData, error: studentErr } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+      if (!studentErr && studentData) {
+        const formatted: Student[] = studentData.map((item: any) => ({
+          id: item.id,
+          nisn: item.nisn || '',
+          nis: item.nis || '',
+          name: item.name || '',
+          gender: (item.gender ? String(item.gender).toUpperCase() : 'L') as 'L' | 'P',
+          class: item.class || '10B',
+          major: item.major || 'Tunagrahita',
+          religion: item.religion || 'Islam',
+          specialNeeds: item.specialNeeds || item.special_needs || 'Tidak Ada',
+          generation: item.generation || '2025/2026',
+          entryYear: Number(item.entryYear || item.entry_year) || 2025,
+          status: item.status || 'Aktif',
+          birthPlace: item.birthPlace || item.birth_place || '',
+          birthDate: item.birthDate || item.birth_date || '',
+          address: item.address || '',
+          phone: item.phone || '',
+          parentName: item.parentName || item.parent_name || '',
+          parentPhone: item.parentPhone || item.parent_phone || '',
+          notes: item.notes || '',
+          createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+        }));
+        setStudents(formatted);
       }
-    };
 
-    fetchCloudData();
-  }, []);
+      // Fetch Users
+      const { data: userData, error: userErr } = await supabase.from('users').select('*');
+      if (!userErr && userData) {
+        setUsers(userData as User[]);
+      }
+
+      // Fetch Achievements
+      const { data: achData, error: achErr } = await supabase.from('achievements').select('*');
+      if (!achErr && achData) {
+        setAchievements(achData as Achievement[]);
+      }
+
+      // Fetch Alumni
+      const { data: almData, error: almErr } = await supabase.from('alumni').select('*');
+      if (!almErr && almData) {
+        setAlumni(almData as Alumni[]);
+      }
+    } catch (err) {
+      console.error('Error saat mengambil data dari Supabase:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchAllDataFromSupabase();
+    }
+  }, [isLoggedIn]);
 
   const askConfirmation = (config: {
     title: string;
@@ -150,115 +143,39 @@ export default function App() {
     });
   };
 
-  useEffect(() => { setStoredStudents(students); }, [students]);
-  useEffect(() => { setStoredUsers(users); }, [users]);
-  useEffect(() => { setStoredAchievements(achievements); }, [achievements]);
-  useEffect(() => { setStoredAlumni(alumni); }, [alumni]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('sim_kesiswaan_is_logged_in_v1', JSON.stringify(isLoggedIn));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [isLoggedIn]);
-
-  const handleCommitImport = (importedStudents: Student[]) => {
-    if (!importedStudents || importedStudents.length === 0) {
-      alert('Tidak ada data siswa yang diimpor.');
-      return;
-    }
-
-    setStudents((prevStudents) => {
-      const formattedImport = importedStudents.map((s, idx) => ({
-        ...s,
-        id: s.id || `imported-${Date.now()}-${idx}`,
-        gender: (s.gender ? String(s.gender).toUpperCase() : 'L') as 'L' | 'P',
-        religion: s.religion || 'Islam',
-        specialNeeds: s.specialNeeds || 'Tidak Ada',
-        status: s.status || 'Aktif',
-        class: s.class || '10B',
-      }));
-
-      const existingNisns = new Set(prevStudents.map((s) => s.nisn).filter(Boolean));
-      const freshOnly = formattedImport.filter((s) => !s.nisn || !existingNisns.has(s.nisn));
-
-      const updatedList = [...freshOnly, ...prevStudents];
-
-      setStoredStudents(updatedList);
-      syncToCloud(updatedList);
-
-      return updatedList;
-    });
-
-    addActivityLog(
-      currentUser.name,
-      currentUser.role,
-      'IMPORT_EXCEL',
-      `Berhasil mengimpor ${importedStudents.length} data siswa baru.`
-    );
-    setLogs(getStoredLogs());
-
-    setActiveTab('students');
-  };
-
-  const handleLoginSuccess = (user: User) => {
-    setCurrentUserRule(user);
-    setCurrentUser(user);
-    setIsLoggedIn(true);
-    addActivityLog(user.name, user.role, 'LOGIN', `Berhasil login sebagai ${user.name}`);
-    setLogs(getStoredLogs());
-  };
-
-  const handleLogout = () => {
-    addActivityLog(currentUser.name, currentUser.role, 'LOGOUT', `Pengguna ${currentUser.name} keluar dari sistem`);
-    setIsLoggedIn(false);
-    localStorage.setItem('sim_kesiswaan_is_logged_in_v1', 'false');
-    setLogs(getStoredLogs());
-  };
-
-  const handleSwitchUser = (user: User) => {
-    setCurrentUserRule(user);
-    setCurrentUser(user);
-    
-    if (user.role !== 'ADMIN' && activeTab === 'users') {
-      setActiveTab('dashboard');
-    }
-
-    addActivityLog(user.name, user.role, 'SWITCH_USER', `Beralih peran sebagai ${user.name}`);
-    setLogs(getStoredLogs());
-  };
-
-  const handleResetData = () => {
-    askConfirmation({
-      title: 'Reset Data Demo',
-      message: 'Apakah Anda yakin ingin mereset seluruh data kembali ke set awal demo?',
-      confirmText: 'Reset Sekarang',
-      variant: 'warning',
-      onConfirm: () => {
-        resetDataToDefault();
-        setStudents(getStoredStudents());
-        setUsers(getStoredUsers());
-        setAchievements(getStoredAchievements());
-        setAlumni(getStoredAlumni());
-        setCurrentUserRule(getCurrentUser());
-        setLogs(getStoredLogs());
-      },
-    });
-  };
-
-  const handleSaveStudent = (data: Partial<Student>) => {
+  // 2. SIMPAN / EDIT SISWA LANGSUNG KE SUPABASE
+  const handleSaveStudent = async (data: Partial<Student>) => {
     if (editingStudent) {
-      setStudents((prev) => {
-        const updated = prev.map((s) => (s.id === editingStudent.id ? ({ ...s, ...data } as Student) : s));
-        setStoredStudents(updated);
-        syncToCloud(updated);
-        return updated;
-      });
-      addActivityLog(currentUser.name, currentUser.role, 'UPDATE_STUDENT', `Memperbarui data siswa: ${data.name}`);
+      const payload = {
+        name: data.name,
+        nisn: data.nisn,
+        nis: data.nis,
+        gender: data.gender,
+        class: data.class,
+        major: data.major,
+        religion: data.religion,
+        specialNeeds: data.specialNeeds,
+        special_needs: data.specialNeeds,
+        status: data.status,
+        birthPlace: data.birthPlace,
+        birth_place: data.birthPlace,
+        birthDate: data.birthDate,
+        birth_date: data.birthDate,
+        address: data.address,
+        phone: data.phone,
+        parentName: data.parentName,
+        parent_name: data.parentName,
+        parentPhone: data.parentPhone,
+        parent_phone: data.parentPhone,
+        notes: data.notes,
+      };
+
+      const { error } = await supabase.from('students').update(payload).eq('id', editingStudent.id);
+      if (error) alert(`Gagal memperbarui siswa: ${error.message}`);
     } else {
-      const newStudent: Student = {
-        id: `std-${Date.now()}`,
+      const newId = `std-${Date.now()}`;
+      const payload = {
+        id: newId,
         nisn: data.nisn || `00${Date.now()}`,
         nis: data.nis || `${23241000 + students.length}`,
         name: data.name || 'Siswa Baru',
@@ -267,66 +184,67 @@ export default function App() {
         major: data.major || 'Tunagrahita',
         religion: data.religion || 'Islam',
         specialNeeds: data.specialNeeds || 'Tidak Ada',
+        special_needs: data.specialNeeds || 'Tidak Ada',
         generation: data.generation || '2025/2026',
         entryYear: data.entryYear || 2025,
+        entry_year: String(data.entryYear || 2025),
         status: data.status || 'Aktif',
         birthPlace: data.birthPlace || '',
+        birth_place: data.birthPlace || '',
         birthDate: data.birthDate || '',
+        birth_date: data.birthDate || '',
         address: data.address || '',
         phone: data.phone || '',
         parentName: data.parentName || '',
+        parent_name: data.parentName || '',
         parentPhone: data.parentPhone || '',
+        parent_phone: data.parentPhone || '',
         notes: data.notes || '',
         createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
-      setStudents((prev) => {
-        const updated = [newStudent, ...prev];
-        setStoredStudents(updated);
-        syncToCloud(updated);
-        return updated;
-      });
-      addActivityLog(currentUser.name, currentUser.role, 'ADD_STUDENT', `Menambahkan siswa baru: ${newStudent.name}`);
+
+      const { error } = await supabase.from('students').insert([payload]);
+      if (error) alert(`Gagal menambah siswa: ${error.message}`);
     }
+
     setEditingStudent(null);
-    setLogs(getStoredLogs());
+    setIsStudentModalOpen(false);
+    await fetchAllDataFromSupabase();
   };
 
+  // 3. HAPUS SISWA LANGSUNG DARI SUPABASE
   const handleDeleteStudent = (id: string) => {
     const target = students.find((s) => s.id === id);
     const targetName = target ? target.name : 'Siswa';
+    
     askConfirmation({
       title: 'Hapus Data Siswa',
-      message: `Apakah Anda yakin ingin menghapus data siswa "${targetName}"?`,
+      message: `Apakah Anda yakin ingin menghapus data siswa "${targetName}" secara permanen dari Supabase?`,
       confirmText: 'Hapus Siswa',
       variant: 'danger',
-      onConfirm: () => {
-        setStudents((prev) => {
-          const updated = prev.filter((s) => s.id !== id);
-          setStoredStudents(updated);
-          syncToCloud(updated);
-          return updated;
-        });
-        addActivityLog(currentUser.name, currentUser.role, 'DELETE_STUDENT', `Menghapus data siswa: ${targetName}`);
-        setLogs(getStoredLogs());
+      onConfirm: async () => {
+        const { error } = await supabase.from('students').delete().eq('id', id);
+        if (error) {
+          alert(`Gagal menghapus data: ${error.message}`);
+        } else {
+          await fetchAllDataFromSupabase();
+        }
       },
     });
   };
 
+  // 4. LULUSKAN SISWA & MUTASI
   const handleGraduateStudent = (student: Student) => {
     askConfirmation({
       title: 'Luluskan Siswa ke Alumni',
       message: `Ubah status "${student.name}" menjadi Lulus dan tambahkan data ini ke Rekap Alumni?`,
       confirmText: 'Luluskan Siswa',
       variant: 'info',
-      onConfirm: () => {
-        setStudents((prev) => {
-          const updated = prev.map((s) => (s.id === student.id ? { ...s, status: 'Lulus' as const } : s));
-          setStoredStudents(updated);
-          syncToCloud(updated);
-          return updated;
-        });
-
-        const newAlumniRecord: Alumni = {
+      onConfirm: async () => {
+        await supabase.from('students').update({ status: 'Lulus' }).eq('id', student.id);
+        
+        const newAlumni = {
           id: `alm-${Date.now()}`,
           studentId: student.id,
           nisn: student.nisn,
@@ -336,14 +254,14 @@ export default function App() {
           currentStatus: 'Kuliah',
           institutionName: 'Perguruan Tinggi',
           positionOrMajor: student.major,
-          phone: student.phone || '08123456789',
+          phone: student.phone || '-',
           address: student.address || '-',
-          notes: 'Dialihkan dari Data Siswa Aktif',
+          notes: 'Dialihkan dari Siswa Aktif',
           updatedAt: new Date().toISOString(),
         };
-        setAlumni((prev) => [newAlumniRecord, ...prev]);
-        addActivityLog(currentUser.name, currentUser.role, 'GRADUATE_STUDENT', `Meluluskan siswa "${student.name}"`);
-        setLogs(getStoredLogs());
+
+        await supabase.from('alumni').insert([newAlumni]);
+        await fetchAllDataFromSupabase();
       },
     });
   };
@@ -354,51 +272,26 @@ export default function App() {
       message: `Apakah Anda yakin ingin mengubah status siswa "${student.name}" menjadi Mutasi (Pindah Sekolah)?`,
       confirmText: 'Proses Mutasi',
       variant: 'warning',
-      onConfirm: () => {
-        setStudents((prev) => {
-          const updated = prev.map((s) => 
-            s.id === student.id ? { ...s, status: 'Mutasi' as const } : s
-          );
-          setStoredStudents(updated);
-          syncToCloud(updated);
-          return updated;
-        });
-
-        addActivityLog(
-          currentUser.name,
-          currentUser.role,
-          'MUTATE_STUDENT',
-          `Memindahkan status siswa "${student.name}" ke Mutasi`
-        );
-        setLogs(getStoredLogs());
+      onConfirm: async () => {
+        await supabase.from('students').update({ status: 'Mutasi' }).eq('id', student.id);
+        await fetchAllDataFromSupabase();
       },
     });
   };
 
-  const handleEditUser = async (updatedUser: User) => {
-    const isSuccess = await syncUserToSupabase(updatedUser);
-    if (isSuccess) {
-      const updatedUsers = users.map((u) => (u.id === updatedUser.id ? updatedUser : u));
-      setUsers(updatedUsers);
-      setStoredUsers(updatedUsers);
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUserRule(user);
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+  };
 
-      if (currentUser.id === updatedUser.id) {
-        setCurrentUserRule(updatedUser);
-        setCurrentUser(updatedUser);
-      }
-
-      addActivityLog(currentUser.name, currentUser.role, 'UPDATE_USER', `Memperbarui data pengguna: ${updatedUser.name}`);
-      setLogs(getStoredLogs());
-    }
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.setItem('sim_kesiswaan_is_logged_in_v1', 'false');
   };
 
   if (!isLoggedIn) {
-    return (
-      <LoginPage
-        allUsers={users}
-        onLoginSuccess={handleLoginSuccess}
-      />
-    );
+    return <LoginPage allUsers={users} onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -407,8 +300,11 @@ export default function App() {
         currentUser={currentUser}
         allUsers={users}
         schoolLogo={schoolLogo}
-        onSwitchUser={handleSwitchUser}
-        onResetData={handleResetData}
+        onSwitchUser={(user) => {
+          setCurrentUserRule(user);
+          setCurrentUser(user);
+        }}
+        onResetData={() => fetchAllDataFromSupabase()}
         onOpenDoc={() => setActiveTab('technical-doc')}
         onLogout={handleLogout}
         onOpenSchoolLogoModal={() => setIsLogoModalOpen(true)}
@@ -493,10 +389,10 @@ export default function App() {
 
           {activeTab === 'excel-upload' && (
             <ExcelUpload
-              onCommitImport={handleCommitImport}
-              onImportSuccess={handleCommitImport}
-              onImportStudents={handleCommitImport}
-              existingStudents={students}
+              onCommitImport={async () => {
+                await fetchAllDataFromSupabase();
+                setActiveTab('students');
+              }}
             />
           )}
 
@@ -505,11 +401,14 @@ export default function App() {
               achievements={achievements}
               students={students}
               userRole={currentUser.role}
-              onAddAchievement={(newAchData) => {
-                const newAch: Achievement = { ...newAchData, id: `ach-${Date.now()}`, createdAt: new Date().toISOString() };
-                setAchievements((prev) => [newAch, ...prev]);
+              onAddAchievement={async (newAchData) => {
+                await supabase.from('achievements').insert([{ ...newAchData, id: `ach-${Date.now()}` }]);
+                await fetchAllDataFromSupabase();
               }}
-              onDeleteAchievement={(id) => setAchievements((prev) => prev.filter((a) => a.id !== id))}
+              onDeleteAchievement={async (id) => {
+                await supabase.from('achievements').delete().eq('id', id);
+                await fetchAllDataFromSupabase();
+              }}
             />
           )}
 
@@ -517,90 +416,47 @@ export default function App() {
             <AlumniList
               alumni={alumni}
               userRole={currentUser.role}
-              onAddAlumni={(newAlumniData) => {
-                const newAlm: Alumni = { ...newAlumniData, id: `alm-${Date.now()}`, updatedAt: new Date().toISOString() };
-                setAlumni((prev) => [newAlm, ...prev]);
+              onAddAlumni={async (newAlumniData) => {
+                await supabase.from('alumni').insert([{ ...newAlumniData, id: `alm-${Date.now()}` }]);
+                await fetchAllDataFromSupabase();
               }}
-              onDeleteAlumni={(id) => setAlumni((prev) => prev.filter((a) => a.id !== id))}
+              onDeleteAlumni={async (id) => {
+                await supabase.from('alumni').delete().eq('id', id);
+                await fetchAllDataFromSupabase();
+              }}
             />
           )}
 
-          {/* Halaman Manajemen Pengguna */}
           {activeTab === 'users' && (
-            currentUser.role === 'ADMIN' ? (
-              <UserManagement
-                users={users}
-                currentUser={currentUser}
-                onAddUser={async (newUserData) => {
-                  const newUser: User = { 
-                    ...newUserData, 
-                    id: `usr-${Date.now()}`, 
-                    createdAt: new Date().toISOString() 
-                  };
-
-                  // 1. Kirim data ke Supabase terlebih dahulu
-                  const isSuccess = await syncUserToSupabase(newUser);
-
-                  // 2. Hanya update State & LocalStorage jika Supabase berhasil menyimpan
-                  if (isSuccess) {
-                    const updatedUsers = [...users, newUser];
-                    setUsers(updatedUsers);
-                    setStoredUsers(updatedUsers);
-
-                    addActivityLog(currentUser.name, currentUser.role, 'ADD_USER', `Menambahkan pengguna baru: ${newUser.name}`);
-                    setLogs(getStoredLogs());
-                  }
-                }}
-                onEditUser={handleEditUser}
-                onToggleUserStatus={async (userId) => {
-                  const targetUser = users.find((u) => u.id === userId);
-                  if (!targetUser) return;
-
-                  const updatedUser = { 
-                    ...targetUser, 
-                    status: (targetUser.status === 'aktif' ? 'nonaktif' : 'aktif') as 'aktif' | 'nonaktif' 
-                  };
-
-                  const isSuccess = await syncUserToSupabase(updatedUser);
-                  if (isSuccess) {
-                    const updatedUsers = users.map((u) => u.id === userId ? updatedUser : u);
-                    setUsers(updatedUsers);
-                    setStoredUsers(updatedUsers);
-                  }
-                }}
-                onDeleteUser={async (userId) => {
-                  const isSuccess = await deleteUserFromSupabase(userId);
-                  if (isSuccess || true) {
-                    const updatedUsers = users.filter((u) => u.id !== userId);
-                    setUsers(updatedUsers);
-                    setStoredUsers(updatedUsers);
-                  }
-                }}
-              />
-            ) : (
-              <div className="p-8 text-center bg-white rounded-2xl shadow-sm border border-slate-100 my-4">
-                <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-                  🚫
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">Akses Ditolak</h3>
-                <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
-                  Halaman Manajemen Pengguna hanya dapat diakses oleh akun dengan peran <strong>Admin (Waka Kesiswaan)</strong>.
-                </p>
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className="mt-5 px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20"
-                >
-                  Kembali ke Dashboard
-                </button>
-              </div>
-            )
+            <UserManagement
+              users={users}
+              currentUser={currentUser}
+              onAddUser={async (user) => {
+                await supabase.from('users').insert([{ ...user, id: `usr-${Date.now()}` }]);
+                await fetchAllDataFromSupabase();
+              }}
+              onEditUser={async (user) => {
+                await supabase.from('users').update(user).eq('id', user.id);
+                await fetchAllDataFromSupabase();
+              }}
+              onToggleUserStatus={async (userId) => {
+                const u = users.find((item) => item.id === userId);
+                if (u) {
+                  await supabase.from('users').update({ status: u.status === 'aktif' ? 'nonaktif' : 'aktif' }).eq('id', userId);
+                  await fetchAllDataFromSupabase();
+                }
+              }}
+              onDeleteUser={async (userId) => {
+                await supabase.from('users').delete().eq('id', userId);
+                await fetchAllDataFromSupabase();
+              }}
+            />
           )}
 
           {activeTab === 'technical-doc' && <TechnicalDoc />}
         </main>
       </div>
 
-      {/* Modals */}
       <SchoolLogoModal
         isOpen={isLogoModalOpen}
         onClose={() => setIsLogoModalOpen(false)}
@@ -616,11 +472,7 @@ export default function App() {
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
         students={students}
-        onStudentsUpdated={(newStudents) => {
-          setStudents(newStudents);
-          setStoredStudents(newStudents);
-          syncToCloud(newStudents);
-        }}
+        onStudentsUpdated={() => fetchAllDataFromSupabase()}
       />
 
       <StudentModal
@@ -647,20 +499,6 @@ export default function App() {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
-
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="font-bold">
-            SIM-KESISWAAN © {new Date().getFullYear()} • Sistem Manajemen Data Kesiswaan
-          </div>
-          <button
-            onClick={() => setActiveTab('technical-doc')}
-            className="text-blue-600 hover:underline font-bold"
-          >
-            Rekomendasi Tech Stack & ERD
-          </button>
-        </div>
-      </footer>
     </div>
   );
 }

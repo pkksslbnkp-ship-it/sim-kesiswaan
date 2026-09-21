@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, ArrowRight, Download, Info } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, ArrowRight, Download, Info, RefreshCw, CloudUpload } from 'lucide-react';
 import { Student } from '../types';
+import { getSupabaseCredentials } from '../lib/supabaseConfig';
 
 interface ExcelUploadProps {
   onCommitImport?: (importedStudents: Student[]) => void;
@@ -17,11 +18,12 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
   const [parsedData, setParsedData] = useState<Student[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncingSupabase, setIsSyncingSupabase] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
   // 1. FUNGSI UNDUH TEMPLATE DENGAN KOLOM BIODATA LENGKAP
   const handleDownloadTemplate = () => {
-    // Header lengkap sesuai tampilan Biodata & Kontak Aplikasi
     const headers = [
       'NISN',
       'NIS',
@@ -38,20 +40,17 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
       'STATUS'
     ];
     
-    // Contoh data siswa dummy dengan biodata lengkap
     const sampleRows = [
       ['106590001', '2324101', 'Ahmad Rizky Pratama', '10B', 'L', 'Islam', 'Tidak Ada', 'Banyumas', '2008-05-12', '081234567890', 'Budi Pratama', 'Jl. Merdeka No. 12, Purwokerto', 'Aktif'],
       ['106590002', '2324102', 'Siti Nurhaliza', '10B', 'P', 'Islam', 'Tunagrahita', 'Sleman', '2008-09-20', '085712345678', 'Rahmat Hidayat', 'Jl. Kaliurang Km 9, Sleman', 'Aktif'],
       ['106590003', '2324103', 'Adzrul Nuriksan', '12C', 'L', 'Islam', 'Tunagrahita', 'Yogyakarta', '2007-01-15', '089611223344', 'Nurhadi', 'Jl. Magelang No. 45, Yogyakarta', 'Aktif'],
     ];
 
-    // Gunakan titik koma (;) standar MS Excel Indonesia
     const csvRows = [
       headers.join(';'),
       ...sampleRows.map((row) => row.map((val) => `"${val}"`).join(';')),
     ];
 
-    // Tambahkan UTF-8 BOM (\uFEFF) agar rapi saat dibuka di MS Excel
     const csvContent = '\uFEFF' + csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -65,7 +64,6 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Helper mendeteksi pemisah CSV (Titik Koma ';' vs Koma ',' vs Tab '\t')
   const detectDelimiter = (text: string): string => {
     const firstLine = text.split(/\r\n|\n/)[0] || '';
     if (firstLine.includes(';')) return ';';
@@ -73,7 +71,6 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
     return ',';
   };
 
-  // Helper membersihkan petik dan spasi
   const cleanValue = (val: string | undefined): string => {
     if (!val) return '';
     return val.replace(/^["']|["']$/g, '').trim();
@@ -86,6 +83,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
 
     setFileName(file.name);
     setErrorMsg(null);
+    setSyncSuccessMsg(null);
     setIsProcessing(true);
 
     const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
@@ -118,7 +116,6 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
         const delimiter = detectDelimiter(lines[0]);
         const headerCols = lines[0].split(delimiter).map((h) => cleanValue(h).toUpperCase());
 
-        // Deteksi Otomatis Indeks Kolom Header
         let nameIdx = headerCols.findIndex((h) => h.includes('NAMA SISWA') || h.includes('NAMA'));
         let nisnIdx = headerCols.findIndex((h) => h.includes('NISN'));
         let nisIdx = headerCols.findIndex((h) => h.includes('NIS') && !h.includes('NISN'));
@@ -129,14 +126,12 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
         let religionIdx = headerCols.findIndex((h) => h.includes('AGAMA'));
         let needsIdx = headerCols.findIndex((h) => h.includes('KHUSUS') || h.includes('KEBUTUHAN'));
         
-        // Indeks Biodata Baru
         let pobIdx = headerCols.findIndex((h) => h.includes('TEMPAT') || h.includes('POB'));
         let dobIdx = headerCols.findIndex((h) => h.includes('TANGGAL') || h.includes('TGL') || h.includes('DOB'));
         let phoneIdx = headerCols.findIndex((h) => h.includes('TELEPON') || h.includes('HP') || h.includes('WA') || h.includes('TELP'));
         let parentIdx = headerCols.findIndex((h) => h.includes('ORANG TUA') || h.includes('WALI') || h.includes('ORTU'));
         let addressIdx = headerCols.findIndex((h) => h.includes('ALAMAT') || h.includes('ADDRESS'));
 
-        // Fallback jika nama header tidak terdeteksi
         if (nameIdx === -1) {
           const firstDataLine = lines[1].split(delimiter).map(cleanValue);
           nameIdx = firstDataLine.findIndex((val) => isNaN(Number(val)) && val.length > 2);
@@ -156,17 +151,16 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
           const genderNormalized: 'L' | 'P' = genderRaw.startsWith('P') || genderRaw.includes('PEREMPUAN') ? 'P' : 'L';
 
           importedStudents.push({
-            id: `imported-${Date.now()}-${idx}`,
+            id: `imported-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
             nisn: cols[nisnIdx] || `${106590000 + idx}`,
             nis: cols[nisIdx] || `${2324100 + idx}`,
             name: rawName,
             gender: genderNormalized,
             class: cols[classIdx] || '10B',
             major: 'Tunagrahita',
-            religion: cols[religionIdx] || 'Islam',
-            specialNeeds: cols[needsIdx] || 'Tidak Ada',
+            religion: (cols[religionIdx] as any) || 'Islam',
+            specialNeeds: (cols[needsIdx] as any) || 'Tidak Ada',
             
-            // MAP DATA BIODATA & KONTAK BARU
             birthPlace: pobIdx !== -1 && cols[pobIdx] ? cols[pobIdx] : '-',
             birthDate: dobIdx !== -1 && cols[dobIdx] ? cols[dobIdx] : '-',
             phone: phoneIdx !== -1 && cols[phoneIdx] ? cols[phoneIdx] : '-',
@@ -195,8 +189,8 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
     reader.readAsText(file, 'UTF-8');
   };
 
-  // 3. HANDLER SIMPAN KE UTAMA
-  const handleCommit = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // 3. HANDLER SIMPAN & SYNC OTOMATIS KE SUPABASE
+  const handleCommit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -205,6 +199,63 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
       return;
     }
 
+    setIsSyncingSupabase(true);
+    setErrorMsg(null);
+    setSyncSuccessMsg(null);
+
+    // Kirim & Sync ke Supabase secara Otomatis
+    try {
+      const { url, key } = getSupabaseCredentials();
+
+      if (url && key) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(url, key);
+
+        const payload = parsedData.map((s) => ({
+          id: s.id,
+          nisn: s.nisn,
+          nis: s.nis,
+          name: s.name,
+          gender: s.gender,
+          class: s.class,
+          major: s.major,
+          religion: s.religion,
+          specialNeeds: s.specialNeeds,
+          special_needs: s.specialNeeds,
+          generation: s.generation,
+          entryYear: s.entryYear,
+          entry_year: s.entryYear ? String(s.entryYear) : '',
+          status: s.status,
+          birthPlace: s.birthPlace,
+          birth_place: s.birthPlace,
+          birthDate: s.birthDate,
+          birth_date: s.birthDate,
+          address: s.address,
+          phone: s.phone,
+          parentName: s.parentName,
+          parent_name: s.parentName,
+          parentPhone: s.parentPhone,
+          parent_phone: s.parentPhone,
+          notes: s.notes,
+          createdAt: s.createdAt,
+          created_at: s.createdAt || new Date().toISOString(),
+        }));
+
+        const { error: supabaseError } = await supabase.from('students').upsert(payload, { onConflict: 'id' });
+
+        if (supabaseError) {
+          console.warn('Peringatan Sync Cloud:', supabaseError.message);
+        } else {
+          setSyncSuccessMsg(`Berhasil sinkronisasi otomatis ${parsedData.length} data siswa ke Cloud Supabase!`);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error saat auto-sync ke Supabase:', err);
+    } finally {
+      setIsSyncingSupabase(false);
+    }
+
+    // Eksekusi Callback State Lokal Aplikasi
     if (onCommitImport) onCommitImport(parsedData);
     else if (onImportSuccess) onImportSuccess(parsedData);
     else if (onImportStudents) onImportStudents(parsedData);
@@ -225,7 +276,6 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
           </p>
         </div>
 
-        {/* Tombol Unduh Template */}
         <button
           type="button"
           onClick={handleDownloadTemplate}
@@ -244,7 +294,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
           <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
             <li>Klik tombol <strong>"Unduh Template CSV Lengkap"</strong>.</li>
             <li>Buka file di Microsoft Excel, lalu isi data orang tua, nomor WA, dan alamat siswa.</li>
-            <li>Simpan (Save) dan unggah kembali file CSV tersebut di bawah.</li>
+            <li>Simpan (Save) dan unggah kembali file CSV tersebut di bawah. Data akan otomatis disinkronkan ke Supabase.</li>
           </ol>
         </div>
       </div>
@@ -281,6 +331,16 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
         </div>
       )}
 
+      {syncSuccessMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-2xl flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold">Sinkronisasi Cloud Berhasil:</p>
+            <p>{syncSuccessMsg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Preview Data Terbaca */}
       {parsedData.length > 0 && (
         <div className="space-y-4 pt-2">
@@ -292,11 +352,22 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({
 
             <button
               type="button"
+              disabled={isSyncingSupabase}
               onClick={handleCommit}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
             >
-              <span>Simpan & Masukkan {parsedData.length} Siswa Baru</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSyncingSupabase ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan & Auto Sync Supabase...</span>
+                </>
+              ) : (
+                <>
+                  <CloudUpload className="w-4 h-4" />
+                  <span>Simpan & Auto Sync {parsedData.length} Siswa</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </div>
 
