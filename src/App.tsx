@@ -36,7 +36,7 @@ export default function App() {
     }
   });
 
-  // State Utama Murni Terhubung Supabase
+  // State Utama Terhubung Supabase
   const [currentUser, setCurrentUserRule] = useState<User>(getCurrentUser());
   const [users, setUsers] = useState<User[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -68,7 +68,11 @@ export default function App() {
   const fetchAllDataFromSupabase = async () => {
     try {
       // Fetch Students
-      const { data: studentData, error: studentErr } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+      const { data: studentData, error: studentErr } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
       if (!studentErr && studentData) {
         const formatted: Student[] = studentData.map((item: any) => ({
           id: item.id,
@@ -90,6 +94,8 @@ export default function App() {
           parentName: item.parentName || item.parent_name || '',
           parentPhone: item.parentPhone || item.parent_phone || '',
           notes: item.notes || '',
+          kkUrl: item.kk_url || item.kkUrl || '',
+          akteUrl: item.akte_url || item.akteUrl || '',
           createdAt: item.createdAt || item.created_at || new Date().toISOString(),
         }));
         setStudents(formatted);
@@ -107,10 +113,34 @@ export default function App() {
         setAchievements(achData as Achievement[]);
       }
 
-      // Fetch Alumni
-      const { data: almData, error: almErr } = await supabase.from('alumni').select('*');
+      // Fetch Alumni dengan Formatting Pemetaan Kolom Supabase
+      const { data: almData, error: almErr } = await supabase
+        .from('alumni')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (!almErr && almData) {
-        setAlumni(almData as Alumni[]);
+        const formattedAlumni: Alumni[] = almData.map((item: any) => ({
+          id: item.id,
+          studentId: item.student_id || item.studentId || '',
+          nisn: item.nisn || '',
+          nis: item.nis || '',
+          name: item.name || '',
+          gender: item.gender || 'L',
+          graduationYear: item.graduation_year || item.graduationYear || '2025-2026',
+          birthPlace: item.birth_place || item.birthPlace || '',
+          birthDate: item.birth_date || item.birthDate || '',
+          disabilityType: item.disability_type || item.disabilityType || '',
+          parentName: item.parent_name || item.parentName || '',
+          address: item.address || '',
+          notes: item.notes || '',
+          phone: item.phone || '',
+          currentStatus: item.current_status || item.currentStatus || 'Kerja/Wirausaha',
+          institutionName: item.institution_name || item.institutionName || '',
+          positionOrMajor: item.position_or_major || item.positionOrMajor || '',
+          updatedAt: item.updated_at || item.updatedAt || new Date().toISOString(),
+        }));
+        setAlumni(formattedAlumni);
       }
     } catch (err) {
       console.error('Error saat mengambil data dari Supabase:', err);
@@ -143,7 +173,7 @@ export default function App() {
     });
   };
 
-  // 2. SIMPAN / EDIT SISWA LANGSUNG KE SUPABASE
+  // 2. SIMPAN / EDIT SISWA
   const handleSaveStudent = async (data: Partial<Student>) => {
     if (editingStudent) {
       const payload = {
@@ -168,6 +198,8 @@ export default function App() {
         parentPhone: data.parentPhone,
         parent_phone: data.parentPhone,
         notes: data.notes,
+        kk_url: data.kkUrl,
+        akte_url: data.akteUrl,
       };
 
       const { error } = await supabase.from('students').update(payload).eq('id', editingStudent.id);
@@ -200,6 +232,8 @@ export default function App() {
         parentPhone: data.parentPhone || '',
         parent_phone: data.parentPhone || '',
         notes: data.notes || '',
+        kk_url: data.kkUrl || '',
+        akte_url: data.akteUrl || '',
         createdAt: new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
@@ -213,14 +247,14 @@ export default function App() {
     await fetchAllDataFromSupabase();
   };
 
-  // 3. HAPUS SISWA LANGSUNG DARI SUPABASE
+  // 3. HAPUS SISWA
   const handleDeleteStudent = (id: string) => {
     const target = students.find((s) => s.id === id);
     const targetName = target ? target.name : 'Siswa';
     
     askConfirmation({
       title: 'Hapus Data Siswa',
-      message: `Apakah Anda yakin ingin menghapus data siswa "${targetName}" secara permanen dari Supabase?`,
+      message: `Apakah Anda yakin ingin menghapus data siswa "${targetName}" secara permanen?`,
       confirmText: 'Hapus Siswa',
       variant: 'danger',
       onConfirm: async () => {
@@ -234,7 +268,76 @@ export default function App() {
     });
   };
 
-  // 4. LULUSKAN SISWA & MUTASI
+  // 4. HANDLER KHUSUS ALUMNI (TAMBAH, EDIT, HAPUS)
+  const handleAddAlumni = async (data: Partial<Alumni>) => {
+    const payload = {
+      id: `alm-${Date.now()}`,
+      name: data.name,
+      gender: data.gender || 'L',
+      graduation_year: (data as any).graduationYear || '2025-2026',
+      birth_place: (data as any).birthPlace || '',
+      birth_date: (data as any).birthDate || '',
+      disability_type: (data as any).disabilityType || '',
+      parent_name: (data as any).parentName || '',
+      address: data.address || '',
+      notes: data.notes || '',
+      phone: data.phone || '',
+      current_status: data.currentStatus || 'Kerja/Wirausaha',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('alumni').insert([payload]);
+    if (error) {
+      alert(`Gagal menambah alumni: ${error.message}`);
+    } else {
+      await fetchAllDataFromSupabase();
+    }
+  };
+
+  const handleEditAlumni = async (data: Partial<Alumni>) => {
+    if (!data.id) return;
+    const payload = {
+      name: data.name,
+      gender: data.gender,
+      graduation_year: (data as any).graduationYear,
+      birth_place: (data as any).birthPlace,
+      birth_date: (data as any).birthDate,
+      disability_type: (data as any).disabilityType,
+      parent_name: (data as any).parentName,
+      address: data.address,
+      notes: data.notes,
+      phone: data.phone,
+      current_status: data.currentStatus,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('alumni').update(payload).eq('id', data.id);
+    if (error) {
+      alert(`Gagal memperbarui alumni: ${error.message}`);
+    } else {
+      await fetchAllDataFromSupabase();
+    }
+  };
+
+  const handleDeleteAlumni = async (id: string) => {
+    askConfirmation({
+      title: 'Hapus Data Alumni',
+      message: 'Apakah Anda yakin ingin menghapus data alumni ini dari Supabase?',
+      confirmText: 'Hapus Alumni',
+      variant: 'danger',
+      onConfirm: async () => {
+        const { error } = await supabase.from('alumni').delete().eq('id', id);
+        if (error) {
+          alert(`Gagal menghapus alumni: ${error.message}`);
+        } else {
+          await fetchAllDataFromSupabase();
+        }
+      },
+    });
+  };
+
+  // 5. LULUSKAN SISWA & MUTASI
   const handleGraduateStudent = (student: Student) => {
     askConfirmation({
       title: 'Luluskan Siswa ke Alumni',
@@ -246,18 +349,19 @@ export default function App() {
         
         const newAlumni = {
           id: `alm-${Date.now()}`,
-          studentId: student.id,
+          student_id: student.id,
           nisn: student.nisn,
           name: student.name,
-          graduationYear: new Date().getFullYear(),
-          major: student.major,
-          currentStatus: 'Kuliah',
-          institutionName: 'Perguruan Tinggi',
-          positionOrMajor: student.major,
-          phone: student.phone || '-',
-          address: student.address || '-',
-          notes: 'Dialihkan dari Siswa Aktif',
-          updatedAt: new Date().toISOString(),
+          gender: student.gender,
+          graduation_year: '2025-2026',
+          birth_place: student.birthPlace || '',
+          birth_date: student.birthDate || '',
+          disability_type: student.specialNeeds || '',
+          parent_name: student.parentName || '',
+          address: student.address || '',
+          notes: 'Lulusan Siswa Aktif',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
         await supabase.from('alumni').insert([newAlumni]);
@@ -415,15 +519,10 @@ export default function App() {
           {activeTab === 'alumni' && (
             <AlumniList
               alumni={alumni}
-              userRole={currentUser.role}
-              onAddAlumni={async (newAlumniData) => {
-                await supabase.from('alumni').insert([{ ...newAlumniData, id: `alm-${Date.now()}` }]);
-                await fetchAllDataFromSupabase();
-              }}
-              onDeleteAlumni={async (id) => {
-                await supabase.from('alumni').delete().eq('id', id);
-                await fetchAllDataFromSupabase();
-              }}
+              userRole={currentUser.role as 'ADMIN' | 'GURU'}
+              onAddAlumni={handleAddAlumni}
+              onEditAlumni={handleEditAlumni}
+              onDeleteAlumni={handleDeleteAlumni}
             />
           )}
 
@@ -442,7 +541,10 @@ export default function App() {
               onToggleUserStatus={async (userId) => {
                 const u = users.find((item) => item.id === userId);
                 if (u) {
-                  await supabase.from('users').update({ status: u.status === 'aktif' ? 'nonaktif' : 'aktif' }).eq('id', userId);
+                  await supabase
+                    .from('users')
+                    .update({ status: u.status === 'aktif' ? 'nonaktif' : 'aktif' })
+                    .eq('id', userId);
                   await fetchAllDataFromSupabase();
                 }
               }}

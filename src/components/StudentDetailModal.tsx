@@ -1,6 +1,6 @@
 import React from 'react';
 import { Student, Achievement, Alumni } from '../types';
-import { X, Trophy, GraduationCap, Phone, MapPin, UserCheck, Calendar, BookOpen, Tag } from 'lucide-react';
+import { X, Trophy, GraduationCap, Phone, MapPin, UserCheck, Calendar, BookOpen, Tag, FileText, ExternalLink } from 'lucide-react';
 
 interface StudentDetailModalProps {
   student: Student | null;
@@ -121,7 +121,61 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Prestasi Terkait */}
+          {/* Section 2: Dokumen Berkas (KK & Akta Kelahiran) */}
+          <div>
+            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">
+              <FileText className="w-4 h-4 text-blue-600" />
+              <span>Dokumen Berkas Siswa</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-900">Kartu Keluarga (KK)</div>
+                  <div className="text-[10px] font-semibold text-slate-500">
+                    {student.kkUrl ? 'Tersedia' : 'Belum diunggah'}
+                  </div>
+                </div>
+                {student.kkUrl ? (
+                  <a
+                    href={student.kkUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center space-x-1 transition"
+                  >
+                    <span>Lihat</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400 font-bold">-</span>
+                )}
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-900">Akta Kelahiran</div>
+                  <div className="text-[10px] font-semibold text-slate-500">
+                    {student.akteUrl ? 'Tersedia' : 'Belum diunggah'}
+                  </div>
+                </div>
+                {student.akteUrl ? (
+                  <a
+                    href={student.akteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center space-x-1 transition"
+                  >
+                    <span>Lihat</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400 font-bold">-</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Prestasi Terkait */}
           <div>
             <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">
               <Trophy className="w-4 h-4 text-amber-600" />
@@ -154,7 +208,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             )}
           </div>
 
-          {/* Section 3: Status Alumni Jika Sudah Lulus */}
+          {/* Section 4: Status Alumni Jika Sudah Lulus */}
           {alumniRecord && (
             <div>
               <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">

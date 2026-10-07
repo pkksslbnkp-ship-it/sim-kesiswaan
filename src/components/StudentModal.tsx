@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Student, StudentStatus, Gender, Religion, SpecialNeeds } from '../types';
-import { X, Save, User, ShieldCheck } from 'lucide-react';
+import { X, Save, User, CheckCircle2, Loader2, Trash2 } from 'lucide-react';
+import { supabase } from '../lib/supabaseConfig';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -34,7 +35,14 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     parentName: '',
     parentPhone: '',
     notes: '',
+    kkUrl: '',
+    akteUrl: '',
   });
+
+  const [uploadingKk, setUploadingKk] = useState(false);
+  const [uploadingAkte, setUploadingAkte] = useState(false);
+  const [deletingKk, setDeletingKk] = useState(false);
+  const [deletingAkte, setDeletingAkte] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -59,11 +67,91 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         parentName: '',
         parentPhone: '',
         notes: '',
+        kkUrl: '',
+        akteUrl: '',
       });
     }
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'kk' | 'akte') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024) {
+      alert('Ukuran berkas terlalu besar! Maksimal 500 KB.');
+      return;
+    }
+
+    const setUploading = type === 'kk' ? setUploadingKk : setUploadingAkte;
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${type}_${formData.nisn || Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const filePath = `documents/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('dokumen-siswa')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('dokumen-siswa')
+        .getPublicUrl(filePath);
+
+      const downloadUrl = publicUrlData.publicUrl;
+
+      setFormData((prev) => ({
+        ...prev,
+        [type === 'kk' ? 'kkUrl' : 'akteUrl']: downloadUrl,
+      }));
+    } catch (error: any) {
+      alert(`Gagal mengunggah berkas ${type.toUpperCase()}: ${error.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileDelete = async (type: 'kk' | 'akte') => {
+    const urlKey = type === 'kk' ? 'kkUrl' : 'akteUrl';
+    const fileUrl = formData[urlKey];
+    if (!fileUrl) return;
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus berkas ${type.toUpperCase()}?`)) return;
+
+    const setDeleting = type === 'kk' ? setDeletingKk : setDeletingAkte;
+    setDeleting(true);
+
+    try {
+      // Mengambil path relatif dari URL public Supabase
+      const urlPath = fileUrl.split('/dokumen-siswa/')[1];
+      if (urlPath) {
+        const decodedPath = decodeURIComponent(urlPath);
+        const { error: deleteError } = await supabase.storage
+          .from('dokumen-siswa')
+          .remove([decodedPath]);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+      }
+
+      // Hapus URL dari state form
+      setFormData((prev) => ({
+        ...prev,
+        [urlKey]: '',
+      }));
+    } catch (error: any) {
+      alert(`Gagal menghapus berkas: ${error.message || 'Terjadi kesalahan'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,7 +324,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               <label className="block text-xs font-bold text-slate-800 mb-1">Tahun Angkatan</label>
               <input
                 type="text"
-                placeholder="Contoh: 2024/2025"
+                placeholder="Contoh: 2025/2026"
                 value={formData.generation || ''}
                 onChange={(e) => setFormData({ ...formData, generation: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -290,6 +378,99 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               />
             </div>
 
+            {/* Upload File KK & Akte Kelahiran */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              
+              {/* File KK */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                  <span>Upload Kartu Keluarga (KK)</span>
+                  {formData.kkUrl && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={(e) => handleFileUpload(e, 'kk')}
+                    disabled={uploadingKk || deletingKk}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none"
+                  />
+                  {uploadingKk && (
+                    <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center text-xs font-bold text-blue-600 space-x-1">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Mengunggah...</span>
+                    </div>
+                  )}
+                </div>
+                {formData.kkUrl && (
+                  <div className="flex items-center space-x-3 mt-1">
+                    <a
+                      href={formData.kkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-blue-600 underline font-bold"
+                    >
+                      Lihat Dokumen KK
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleFileDelete('kk')}
+                      disabled={deletingKk}
+                      className="text-[10px] text-red-600 hover:text-red-800 font-bold flex items-center space-x-0.5 transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{deletingKk ? 'Menghapus...' : 'Hapus'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* File Akte */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                  <span>Upload Akta Kelahiran</span>
+                  {formData.akteUrl && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={(e) => handleFileUpload(e, 'akte')}
+                    disabled={uploadingAkte || deletingAkte}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none"
+                  />
+                  {uploadingAkte && (
+                    <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center text-xs font-bold text-blue-600 space-x-1">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Mengunggah...</span>
+                    </div>
+                  )}
+                </div>
+                {formData.akteUrl && (
+                  <div className="flex items-center space-x-3 mt-1">
+                    <a
+                      href={formData.akteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-blue-600 underline font-bold"
+                    >
+                      Lihat Dokumen Akte
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleFileDelete('akte')}
+                      disabled={deletingAkte}
+                      className="text-[10px] text-red-600 hover:text-red-800 font-bold flex items-center space-x-0.5 transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{deletingAkte ? 'Menghapus...' : 'Hapus'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
             {/* Catatan Kesiswaan */}
             <div className="sm:col-span-2">
               <label className="block text-xs font-bold text-slate-800 mb-1">Catatan Khusus Kesiswaan / OSIS</label>
@@ -315,7 +496,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-blue-600/20 transition flex items-center space-x-2"
+              disabled={uploadingKk || uploadingAkte || deletingKk || deletingAkte}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-black uppercase tracking-wider shadow-md shadow-blue-600/20 transition flex items-center space-x-2"
             >
               <Save className="w-4 h-4" />
               <span>Simpan Data</span>

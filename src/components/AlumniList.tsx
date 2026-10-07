@@ -1,44 +1,113 @@
 import React, { useState, useMemo } from 'react';
-import { Student } from '../types';
+import { Alumni } from '../types';
 import { 
   FileSpreadsheet, 
   Printer, 
   Search, 
   Filter, 
   RotateCcw, 
-  Users, 
   Eye, 
   Trash2,
-  GraduationCap 
+  GraduationCap,
+  Plus,
+  X,
+  Edit,
+  Save
 } from 'lucide-react';
 
 interface AlumniListProps {
-  students: Student[];
+  alumni: Alumni[];
   userRole: 'ADMIN' | 'GURU';
-  onViewStudentDetail: (student: Student) => void;
-  onDeleteStudent: (id: string) => void;
+  onAddAlumni: (data: Partial<Alumni>) => Promise<void>;
+  onEditAlumni?: (data: Partial<Alumni>) => Promise<void>;
+  onDeleteAlumni: (id: string) => Promise<void>;
 }
 
 export const AlumniList: React.FC<AlumniListProps> = ({
-  students = [],
+  alumni = [],
   userRole,
-  onViewStudentDetail,
-  onDeleteStudent,
+  onAddAlumni,
+  onEditAlumni,
+  onDeleteAlumni,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGender, setSelectedGender] = useState<string>('SEMUA');
   const [selectedGradYear, setSelectedGradYear] = useState<string>('SEMUA');
 
-  // Khusus menyaring data siswa berpangkat / berstatus 'Lulus'
-  const alumniStudents = useMemo(() => {
-    return students.filter((s) => s.status === 'Lulus');
-  }, [students]);
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAlumni, setEditingAlumni] = useState<Alumni | null>(null);
+  const [detailAlumni, setDetailAlumni] = useState<Alumni | null>(null);
 
-  // Daftar Opsi Tahun Lulus Dinamis
+  // Form State
+  const [formData, setFormData] = useState({
+    name: '',
+    gender: 'L',
+    graduationYear: '2025-2026',
+    birthPlace: '',
+    birthDate: '',
+    disabilityType: 'C',
+    parentName: '',
+    address: '',
+    notes: '',
+    phone: '',
+    currentStatus: 'Kerja/Wirausaha',
+  });
+
+  const handleOpenAddModal = () => {
+    setEditingAlumni(null);
+    setFormData({
+      name: '',
+      gender: 'L',
+      graduationYear: '2025-2026',
+      birthPlace: 'Kulon Progo',
+      birthDate: '',
+      disabilityType: 'C',
+      parentName: '',
+      address: '',
+      notes: '',
+      phone: '',
+      currentStatus: 'Kerja/Wirausaha',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (item: Alumni) => {
+    setEditingAlumni(item);
+    setFormData({
+      name: item.name || '',
+      gender: (item.gender as 'L' | 'P') || 'L',
+      graduationYear: String(item.graduationYear || '2025-2026'),
+      birthPlace: (item as any).birthPlace || (item as any).birth_place || '',
+      birthDate: (item as any).birthDate || (item as any).birth_date || '',
+      disabilityType: (item as any).disabilityType || (item as any).disability_type || 'C',
+      parentName: (item as any).parentName || (item as any).parent_name || '',
+      address: item.address || '',
+      notes: item.notes || '',
+      phone: item.phone || '',
+      currentStatus: item.currentStatus || 'Kerja/Wirausaha',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingAlumni && onEditAlumni) {
+      await onEditAlumni({
+        id: editingAlumni.id,
+        ...formData,
+      });
+    } else {
+      await onAddAlumni(formData);
+    }
+    setIsModalOpen(false);
+  };
+
+  // Daftar Opsi Tahun Lulus
   const graduationYears = useMemo(() => {
-    const years = Array.from(new Set(alumniStudents.map((s) => s.graduationYear).filter(Boolean)));
+    const years = Array.from(new Set(alumni.map((s) => String(s.graduationYear)).filter(Boolean)));
     return ['SEMUA', ...years.sort().reverse()];
-  }, [alumniStudents]);
+  }, [alumni]);
 
   // Reset Filter
   const handleResetFilters = () => {
@@ -49,51 +118,45 @@ export const AlumniList: React.FC<AlumniListProps> = ({
 
   // Filter Data Alumni
   const filteredAlumni = useMemo(() => {
-    return alumniStudents.filter((student) => {
+    return alumni.filter((item) => {
       const matchSearch =
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (student.nisn && student.nisn.includes(searchTerm)) ||
-        (student.nis && student.nis.includes(searchTerm));
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ((item as any).parentName && (item as any).parentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.address && item.address.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchGender = selectedGender === 'SEMUA' || student.gender === selectedGender;
-      const matchYear = selectedGradYear === 'SEMUA' || String(student.graduationYear) === selectedGradYear;
+      const matchGender = selectedGender === 'SEMUA' || item.gender === selectedGender;
+      const matchYear = selectedGradYear === 'SEMUA' || String(item.graduationYear) === selectedGradYear;
 
       return matchSearch && matchGender && matchYear;
     });
-  }, [alumniStudents, searchTerm, selectedGender, selectedGradYear]);
+  }, [alumni, searchTerm, selectedGender, selectedGradYear]);
 
-  // Rekapitulasi Data Alumni Terfilter
-  const rekap = useMemo(() => {
-    const total = filteredAlumni.length;
-    const male = filteredAlumni.filter((s) => s.gender === 'L').length;
-    const female = filteredAlumni.filter((s) => s.gender === 'P').length;
-
-    return { total, male, female };
-  }, [filteredAlumni]);
-
-  // Export CSV
+  // Export CSV Format Word
   const handleExportExcel = () => {
     if (filteredAlumni.length === 0) {
       alert('Tidak ada data alumni untuk di-export.');
       return;
     }
 
-    const headers = ['NO', 'NISN', 'NIS', 'NAMA ALUMNI', 'GENDER', 'TAHUN LULUS', 'CATATAN / STATUS'];
-    const rows = filteredAlumni.map((s, idx) => [
+    const headers = ['NO', 'TAHUN KELULUSAN', 'NAMA', 'P/L', 'TEMPAT LAHIR', 'TANGGAL LAHIR', 'KETUNAAN', 'NAMA ORTU', 'ALAMAT', 'KET/STATUS'];
+    const rows = filteredAlumni.map((s: any, idx) => [
       idx + 1,
-      `"${s.nisn || ''}"`,
-      `"${s.nis || ''}"`,
+      `"${s.graduationYear || '-'}"`,
       `"${s.name || ''}"`,
       `"${s.gender || ''}"`,
-      `"${s.graduationYear || '-'}"`,
-      `"${s.status || 'Lulus'}"`
+      `"${s.birthPlace || s.birth_place || '-'}"`,
+      `"${s.birthDate || s.birth_date || '-'}"`,
+      `"${s.disabilityType || s.disability_type || '-'}"`,
+      `"${s.parentName || s.parent_name || '-'}"`,
+      `"${s.address || '-'}"`,
+      `"${s.notes || s.currentStatus || '-'}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Data_Alumni_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Data_Alumni_SLBN_1_Kulon_Progo_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -105,17 +168,28 @@ export const AlumniList: React.FC<AlumniListProps> = ({
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3">
-            <h2 className="text-xl font-bold text-slate-800">Data & Direktori Alumni</h2>
+            <h2 className="text-xl font-bold text-slate-800">Data & Direktori Alumni SLB Negeri 1 Kulon Progo</h2>
             <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">
               {filteredAlumni.length} Alumni
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Daftar siswa yang telah menyelesaikan masa studi / lulus.
+            Daftar siswa yang telah menyelesaikan masa studi / lulus dari sekolah.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {userRole === 'ADMIN' && (
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="flex items-center space-x-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Alumni Baru</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleExportExcel}
@@ -160,7 +234,7 @@ export const AlumniList: React.FC<AlumniListProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari Nama / NISN / NIS Alumni..."
+              placeholder="Cari Nama / Ortu / Alamat Alumni..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none transition"
             />
           </div>
@@ -192,60 +266,71 @@ export const AlumniList: React.FC<AlumniListProps> = ({
         </div>
       </div>
 
-      {/* Tabel Alumni */}
+      {/* Tabel Alumni Sesuai Format Word */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="p-4 w-12 text-center">NO</th>
-                <th className="p-4">NISN / NIS</th>
-                <th className="p-4">NAMA ALUMNI</th>
-                <th className="p-4">GENDER</th>
-                <th className="p-4">TAHUN LULUS</th>
-                <th className="p-4 text-center">AKSI</th>
+                <th className="p-3.5 w-10 text-center">NO</th>
+                <th className="p-3.5">TAHUN LULUS</th>
+                <th className="p-3.5">NAMA ALUMNI</th>
+                <th className="p-3.5 text-center">P/L</th>
+                <th className="p-3.5">TTL</th>
+                <th className="p-3.5 text-center">KETUNAAN</th>
+                <th className="p-3.5">NAMA ORTU</th>
+                <th className="p-3.5">ALAMAT</th>
+                <th className="p-3.5">KETERANGAN</th>
+                <th className="p-3.5 text-center">AKSI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {filteredAlumni.length > 0 ? (
-                filteredAlumni.map((student, index) => (
-                  <tr key={student.id} className="hover:bg-slate-50/80 transition">
-                    <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
-                    <td className="p-4">
-                      <div className="font-mono font-bold text-slate-800">{student.nisn || '-'}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{student.nis || '-'}</div>
+                filteredAlumni.map((item: any, index) => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                    <td className="p-3.5 text-center font-medium text-slate-400">{index + 1}</td>
+                    <td className="p-3.5 font-bold text-blue-600">{item.graduationYear || item.graduation_year || '-'}</td>
+                    <td className="p-3.5 font-bold text-slate-800">{item.name}</td>
+                    <td className="p-3.5 text-center font-semibold">{item.gender}</td>
+                    <td className="p-3.5 text-slate-600">
+                      {item.birthPlace || item.birth_place ? `${item.birthPlace || item.birth_place}, ` : ''}
+                      {item.birthDate || item.birth_date || '-'}
                     </td>
-                    <td 
-                      onClick={() => onViewStudentDetail(student)}
-                      className="p-4 font-bold text-slate-800 hover:text-blue-600 cursor-pointer transition"
-                    >
-                      {student.name}
+                    <td className="p-3.5 text-center font-mono font-bold text-purple-700 bg-purple-50 rounded-md">
+                      {item.disabilityType || item.disability_type || '-'}
                     </td>
-                    <td className="p-4 font-semibold text-slate-600">{student.gender}</td>
-                    <td className="p-4">
-                      <span className="bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-md text-[11px]">
-                        {student.graduationYear || 'Lulus'}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center space-x-1.5">
+                    <td className="p-3.5 font-medium text-slate-700">{item.parentName || item.parent_name || '-'}</td>
+                    <td className="p-3.5 text-slate-500 max-w-xs truncate" title={item.address}>{item.address || '-'}</td>
+                    <td className="p-3.5 font-semibold text-emerald-700">{item.notes || item.currentStatus || '-'}</td>
+                    <td className="p-3.5 text-center">
+                      <div className="flex items-center justify-center space-x-1">
                         <button
                           type="button"
-                          onClick={() => onViewStudentDetail(student)}
+                          onClick={() => setDetailAlumni(item)}
                           className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                          title="Lihat Detail Alumni"
+                          title="Lihat Detail"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         {userRole === 'ADMIN' && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteStudent(student.id)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                            title="Hapus Data Alumni"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(item)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="Edit Alumni"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteAlumni(item.id)}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                              title="Hapus Alumni"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -253,7 +338,7 @@ export const AlumniList: React.FC<AlumniListProps> = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
+                  <td colSpan={10} className="p-8 text-center text-slate-400 font-medium">
                     Tidak ada data alumni yang ditemukan.
                   </td>
                 </tr>
@@ -263,31 +348,145 @@ export const AlumniList: React.FC<AlumniListProps> = ({
         </div>
       </div>
 
-      {/* Rekapitulasi Ringkasan Hasil Filter Alumni */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
-          <GraduationCap className="w-4 h-4 text-blue-400" />
-          <span>Rekapitulasi Hasil Filter Data Alumni</span>
+      {/* Modal Input/Edit Alumni */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <h3 className="font-bold text-slate-800 text-base">
+                {editingAlumni ? 'Edit Data Alumni' : 'Tambah Data Alumni Baru'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tahun Kelulusan</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.graduationYear}
+                    onChange={(e) => setFormData({ ...formData, graduationYear: e.target.value })}
+                    placeholder="Contoh: 2025-2026"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Gender (P/L)</label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'L' | 'P' })}
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="L">Laki-Laki (L)</option>
+                    <option value="P">Perempuan (P)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nama Lengkap Alumni</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Nama Alumni..."
+                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tempat Lahir</label>
+                  <input
+                    type="text"
+                    value={formData.birthPlace}
+                    onChange={(e) => setFormData({ ...formData, birthPlace: e.target.value })}
+                    placeholder="Kulon Progo"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tanggal Lahir</label>
+                  <input
+                    type="text"
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    placeholder="DD/MM/YYYY"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Ketunaan</label>
+                  <input
+                    type="text"
+                    value={formData.disabilityType}
+                    onChange={(e) => setFormData({ ...formData, disabilityType: e.target.value })}
+                    placeholder="A / B / C / C1 / D"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nama Orang Tua</label>
+                  <input
+                    type="text"
+                    value={formData.parentName}
+                    onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                    placeholder="Nama Orang Tua..."
+                    className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Alamat Tempat Tinggal</label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Alamat lengkap..."
+                  rows={2}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Keterangan / Pekerjaan / Kuliah</label>
+                <input
+                  type="text"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Contoh: Kuliah di PLB UNY / Wirausaha Sembako"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Data</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-            <span className="block text-[10px] text-slate-400 font-bold uppercase">Total Alumni Terfilter</span>
-            <span className="text-2xl font-black text-white mt-0.5 block">{rekap.total}</span>
-          </div>
-
-          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-            <span className="block text-[10px] text-slate-400 font-bold uppercase">Laki-Laki (L)</span>
-            <span className="text-2xl font-black text-blue-400 mt-0.5 block">{rekap.male}</span>
-          </div>
-
-          <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-            <span className="block text-[10px] text-slate-400 font-bold uppercase">Perempuan (P)</span>
-            <span className="text-2xl font-black text-pink-400 mt-0.5 block">{rekap.female}</span>
-          </div>
-        </div>
-      </div>
-
+      )}
     </div>
   );
 };

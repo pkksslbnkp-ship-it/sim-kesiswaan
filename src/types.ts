@@ -38,9 +38,9 @@ export interface Student {
   gender: Gender;
   religion?: Religion;
   specialNeeds?: SpecialNeeds;
-  class: string; // e.g., '10 IPA 1', '11 TKJ 2', '12 RPL 1'
-  major: string; // e.g., 'MIPA', 'IPS', 'TKJ', 'RPL', 'AKL'
-  generation: string; // e.g., '2023/2024'
+  class: string;
+  major: string;
+  generation: string;
   entryYear: number;
   status: StudentStatus;
   birthPlace?: string;
@@ -50,6 +50,8 @@ export interface Student {
   parentName?: string;
   parentPhone?: string;
   notes?: string;
+  kkUrl?: string;
+  akteUrl?: string;
   createdAt: string;
 }
 
@@ -61,11 +63,11 @@ export interface Achievement {
   studentId: string;
   studentName: string;
   studentClass: string;
-  title: string; // e.g. "Juara 1 OSN Matematika"
+  title: string;
   category: AchievementCategory;
   level: AchievementLevel;
-  organizer: string; // e.g. "Dinas Pendidikan Provinsi"
-  rank: string; // e.g. "Juara 1", "Harapan 2", "Gold Medal"
+  organizer: string;
+  rank: string;
   eventDate: string;
   certificateUrl?: string;
   description?: string;
@@ -82,8 +84,8 @@ export interface Alumni {
   graduationYear: number;
   major: string;
   currentStatus: AlumniCurrentStatus;
-  institutionName?: string; // PTN/PTS atau Nama Perusahaan
-  positionOrMajor?: string; // Jurusan Kuliah atau Jabatan Kerja
+  institutionName?: string;
+  positionOrMajor?: string;
   phone: string;
   email?: string;
   address?: string;
