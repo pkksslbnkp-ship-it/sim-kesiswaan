@@ -107,13 +107,33 @@ export default function App() {
         setUsers(userData as User[]);
       }
 
-      // Fetch Achievements
-      const { data: achData, error: achErr } = await supabase.from('achievements').select('*');
+      // Fetch Achievements (Pemetaan snake_case -> camelCase)
+      const { data: achData, error: achErr } = await supabase
+        .from('achievements')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (!achErr && achData) {
-        setAchievements(achData as Achievement[]);
+        const formattedAchievements: Achievement[] = achData.map((item: any) => ({
+          id: item.id,
+          studentId: item.student_id || item.studentId || '',
+          studentName: item.student_name || item.studentName || '',
+          studentClass: item.student_class || item.studentClass || '',
+          title: item.title || '',
+          category: item.category || 'Olahraga',
+          level: item.level || 'Kabupaten/Kota',
+          organizer: item.organizer || item.event || '',
+          event: item.event || item.organizer || '',
+          rank: item.rank || 'Juara 1',
+          eventDate: item.event_date || item.eventDate || item.year || '',
+          year: item.year || item.event_date || new Date().getFullYear().toString(),
+          certificateUrl: item.certificate_url || item.certificateUrl || '',
+          createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+        }));
+        setAchievements(formattedAchievements);
       }
 
-      // Fetch Alumni dengan Formatting Pemetaan Kolom Supabase
+      // Fetch Alumni dengan Pemetaan Kolom Supabase
       const { data: almData, error: almErr } = await supabase
         .from('alumni')
         .select('*')
@@ -505,13 +525,56 @@ export default function App() {
               achievements={achievements}
               students={students}
               userRole={currentUser.role}
-              onAddAchievement={async (newAchData) => {
-                await supabase.from('achievements').insert([{ ...newAchData, id: `ach-${Date.now()}` }]);
-                await fetchAllDataFromSupabase();
+              onAddAchievement={async (newAchData: any) => {
+                try {
+                  const certUrl = newAchData.certificateUrl || newAchData.certificate_url || '';
+
+                  // Payload disesuaikan persis dengan skema Supabase (snake_case)
+                  const payload: any = {
+                    id: `ach-${Date.now()}`,
+                    student_id: newAchData.studentId || newAchData.student_id || '',
+                    student_name: newAchData.studentName || newAchData.student_name || '',
+                    student_class: newAchData.studentClass || newAchData.class || '10B',
+                    title: newAchData.title || '',
+                    category: newAchData.category || 'Olahraga',
+                    level: newAchData.level || 'Kabupaten/Kota',
+                    organizer: newAchData.organizer || newAchData.event || '',
+                    event: newAchData.event || newAchData.organizer || '',
+                    rank: newAchData.rank || 'Juara 1',
+                    year: String(newAchData.year || new Date().getFullYear()),
+                    event_date: newAchData.eventDate || newAchData.year || new Date().toISOString().split('T')[0],
+                    certificate_url: certUrl || null,
+                  };
+
+                  const { error } = await supabase.from('achievements').insert([payload]);
+
+                  if (error) {
+                    console.error('Supabase Error Detail:', error);
+                    alert(`Gagal menyimpan prestasi: ${error.message}`);
+                    return;
+                  }
+
+                  alert('Prestasi berhasil disimpan!');
+                  await fetchAllDataFromSupabase();
+                } catch (err: any) {
+                  alert(`Terjadi kesalahan: ${err.message}`);
+                }
               }}
               onDeleteAchievement={async (id) => {
-                await supabase.from('achievements').delete().eq('id', id);
-                await fetchAllDataFromSupabase();
+                askConfirmation({
+                  title: 'Hapus Data Prestasi',
+                  message: 'Apakah Anda yakin ingin menghapus data prestasi ini secara permanen?',
+                  confirmText: 'Hapus',
+                  variant: 'danger',
+                  onConfirm: async () => {
+                    const { error } = await supabase.from('achievements').delete().eq('id', id);
+                    if (error) {
+                      alert(`Gagal menghapus prestasi: ${error.message}`);
+                    } else {
+                      await fetchAllDataFromSupabase();
+                    }
+                  },
+                });
               }}
             />
           )}
