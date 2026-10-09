@@ -13,7 +13,9 @@ import {
   GraduationCap,
   RotateCcw,
   Users,
-  ArrowLeftRight
+  ArrowLeftRight,
+  FileText,
+  FileBadge
 } from 'lucide-react';
 
 interface StudentListProps {
@@ -53,7 +55,7 @@ const SPECIAL_NEEDS_LIST = [
   'Lainnya'
 ];
 
-// Helper Ekstraksi Angka Kelas (misal: "11B" -> "11", "7C1" -> "7")
+// Helper Ekstraksi Angka Kelas
 const extractGradeNumber = (className: string = ''): string => {
   if (!className) return '';
   const match = className.trim().match(/\b(10|11|12|[1-9])\b/) || className.trim().match(/^(\d+)/);
@@ -97,7 +99,6 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [selectedSpecialNeeds, setSelectedSpecialNeeds] = useState<string>('SEMUA');
   const [selectedStatus, setSelectedStatus] = useState<string>('SEMUA');
 
-  // Daftar Opsi Kelas yang Rapi (Hanya Angka 1-12)
   const classOptions = useMemo(() => {
     const extractedGrades = new Set<number>();
 
@@ -105,8 +106,6 @@ export const StudentList: React.FC<StudentListProps> = ({
       const gradeNum = extractGradeNumber(s.class || '');
       if (gradeNum) {
         const num = parseInt(gradeNum, 10);
-        
-        // Filter berdasarkan Jenjang yang dipilih
         if (selectedLevel === 'SEMUA') {
           extractedGrades.add(num);
         } else if (selectedLevel === 'SD' && num >= 1 && num <= 6) {
@@ -137,7 +136,6 @@ export const StudentList: React.FC<StudentListProps> = ({
     return students.filter((student) => {
       if (!student) return false;
 
-      // 1. Teks Pencarian
       const term = searchTerm.trim().toLowerCase();
       const matchSearch =
         term === '' ||
@@ -145,24 +143,19 @@ export const StudentList: React.FC<StudentListProps> = ({
         (student.nisn || '').toLowerCase().includes(term) ||
         (student.nis || '').toLowerCase().includes(term);
 
-      // 2. Filter Jenjang
       const studentJenjang = getJenjangFromClass(student.class || '');
       const matchLevel = selectedLevel === 'SEMUA' || studentJenjang === selectedLevel;
 
-      // 3. Filter Kelas Tingkat (Mencocokkan angka kelas, misal "11" cocok dengan "11A", "11B")
       const studentGradeNum = extractGradeNumber(student.class || '');
       const matchClass = selectedClass === 'SEMUA' || studentGradeNum === selectedClass;
 
-      // 4. Filter Gender
       const rawGender = (student.gender || 'L').trim().toUpperCase();
       const matchGender = selectedGender === 'SEMUA' || rawGender === selectedGender;
 
-      // 5. Filter Agama
       const matchReligion =
         selectedReligion === 'SEMUA' ||
         (student.religion || 'Islam').trim().toLowerCase() === selectedReligion.trim().toLowerCase();
 
-      // 6. Filter Kebutuhan Khusus
       const rawNeeds = (student.specialNeeds || '').trim().toLowerCase();
       const cleanNeeds = rawNeeds.replace(/\s*\([^)]*\)/g, '').trim();
       const isNoNeeds =
@@ -182,7 +175,6 @@ export const StudentList: React.FC<StudentListProps> = ({
         matchSpecialNeeds = !isNoNeeds && (cleanNeeds.includes(targetClean) || targetClean.includes(cleanNeeds));
       }
 
-      // 7. Filter Status
       const studentStatus = (student.status || 'Aktif').trim().toLowerCase();
       const matchStatus =
         selectedStatus === 'SEMUA' || studentStatus === selectedStatus.trim().toLowerCase();
@@ -255,7 +247,7 @@ export const StudentList: React.FC<StudentListProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 max-w-xl">
-            Pencarian, filter multi-kategori (Jenjang, Tingkat Kelas, Kelamin, Agama, Kekhususan, Status), dan pengelolaan data siswa.
+            Pencarian, filter multi-kategori, dan pengecekan cepat berkas kesiswaan (KK & Akta).
           </p>
         </div>
 
@@ -302,7 +294,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       </div>
 
-      {/* Filter Multi-Kategori Layout Flexible Wrap */}
+      {/* Filter Multi-Kategori */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -320,10 +312,7 @@ export const StudentList: React.FC<StudentListProps> = ({
           )}
         </div>
 
-        {/* Container Flex Wrap Agar Tulisan Tidak Terpotong */}
         <div className="flex flex-wrap items-center gap-2.5">
-          
-          {/* Input Cari */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -335,7 +324,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             />
           </div>
 
-          {/* Jenjang */}
           <div className="min-w-[130px]">
             <select
               value={selectedLevel}
@@ -352,7 +340,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Filter Kelas Tingkat 1-12 */}
           <div className="min-w-[120px]">
             <select
               value={selectedClass}
@@ -366,7 +353,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Kelamin */}
           <div className="min-w-[130px]">
             <select
               value={selectedGender}
@@ -379,7 +365,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Agama */}
           <div className="min-w-[125px]">
             <select
               value={selectedReligion}
@@ -393,7 +378,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Kekhususan */}
           <div className="min-w-[145px]">
             <select
               value={selectedSpecialNeeds}
@@ -407,7 +391,6 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Status */}
           <div className="min-w-[120px]">
             <select
               value={selectedStatus}
@@ -439,13 +422,16 @@ export const StudentList: React.FC<StudentListProps> = ({
                 <th className="p-4">AGAMA</th>
                 <th className="p-4">KEKHUSUSAN</th>
                 <th className="p-4">STATUS</th>
-                <th className="p-4 text-center">AKSI</th>
+                <th className="p-4 text-center">AKSI & BERKAS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {filteredStudents.length > 0 ? (
                 filteredStudents.map((student, index) => {
                   const jenjang = getJenjangFromClass(student.class || '');
+                  const hasKk = Boolean(student.kkUrl);
+                  const hasAkte = Boolean(student.akteUrl);
+
                   return (
                     <tr key={student.id || index} className="hover:bg-slate-50/80 transition">
                       <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
@@ -501,6 +487,8 @@ export const StudentList: React.FC<StudentListProps> = ({
                       </td>
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center space-x-1.5">
+                          
+                          {/* Tombol Detail (Mata) */}
                           <button
                             type="button"
                             onClick={() => onViewStudentDetail(student)}
@@ -509,6 +497,50 @@ export const StudentList: React.FC<StudentListProps> = ({
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+
+                          {/* Icon Indikator Berkas KK */}
+                          {hasKk ? (
+                            <a
+                              href={student.kkUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
+                              title="Kartu Keluarga (KK) Terunggah - Klik untuk Buka"
+                            >
+                              <FileText className="w-4 h-4 text-emerald-600" />
+                              <span>KK</span>
+                            </a>
+                          ) : (
+                            <span 
+                              className="p-1.5 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
+                              title="Kartu Keluarga (KK) Belum Diunggah"
+                            >
+                              <FileText className="w-4 h-4 text-slate-300" />
+                              <span>KK</span>
+                            </span>
+                          )}
+
+                          {/* Icon Indikator Berkas Akta */}
+                          {hasAkte ? (
+                            <a
+                              href={student.akteUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
+                              title="Akta Kelahiran Terunggah - Klik untuk Buka"
+                            >
+                              <FileBadge className="w-4 h-4 text-blue-600" />
+                              <span>AKTA</span>
+                            </a>
+                          ) : (
+                            <span 
+                              className="p-1.5 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
+                              title="Akta Kelahiran Belum Diunggah"
+                            >
+                              <FileBadge className="w-4 h-4 text-slate-300" />
+                              <span>AKTA</span>
+                            </span>
+                          )}
 
                           {userRole === 'ADMIN' && (
                             <>
