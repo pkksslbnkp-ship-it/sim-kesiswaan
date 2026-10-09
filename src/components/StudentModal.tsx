@@ -56,6 +56,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Handler Upload Berkas dengan Sanitasi Nama File (Mencegah Error NoSuchKey / 404)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'kk' | 'akte') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,8 +71,10 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     setUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${type}_${formData.nisn || Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      // Sanitasi angka NISN dan hapus karakter spesial
+      const safeNisn = (formData.nisn || 'siswa').replace(/[^a-zA-Z0-9]/g, '');
+      const fileName = `${type}_${safeNisn}_${Date.now()}.${fileExt}`;
       const filePath = `documents/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -96,6 +99,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     }
   };
 
+  // Handler Hapus Berkas dengan Ekstraksi Path Fleksibel
   const handleFileDelete = async (type: 'kk' | 'akte') => {
     const urlKey = type === 'kk' ? 'kkUrl' : 'akteUrl';
     const fileUrl = formData[urlKey];
@@ -107,9 +111,15 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     setDeleting(true);
 
     try {
-      const urlPath = fileUrl.split('/dokumen-siswa/')[1];
-      if (urlPath) {
-        const decodedPath = decodeURIComponent(urlPath);
+      let relativePath = '';
+      if (fileUrl.includes('/dokumen-siswa/')) {
+        relativePath = fileUrl.split('/dokumen-siswa/')[1];
+      } else if (fileUrl.includes('documents/')) {
+        relativePath = `documents/${fileUrl.split('documents/')[1]}`;
+      }
+
+      if (relativePath) {
+        const decodedPath = decodeURIComponent(relativePath.split('?')[0]);
         await supabase.storage.from('dokumen-siswa').remove([decodedPath]);
       }
       setFormData((prev) => ({ ...prev, [urlKey]: '' }));
@@ -213,7 +223,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               <select
                 value={formData.gender || 'L'}
                 onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'L' | 'P' })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="L">Laki-laki (L)</option>
                 <option value="P">Perempuan (P)</option>
@@ -226,7 +236,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               <select
                 value={formData.religion || 'Islam'}
                 onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="Islam">Islam</option>
                 <option value="Kristen">Kristen</option>
@@ -244,7 +254,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               <select
                 value={formData.specialNeeds || 'Tidak Ada'}
                 onChange={(e) => setFormData({ ...formData, specialNeeds: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="Tidak Ada">Tidak Ada (Non-Disabilitas)</option>
                 <option value="Tunanetra (A)">Tunanetra (A)</option>
@@ -266,7 +276,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               <select
                 value={formData.status || 'Aktif'}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="Aktif">Aktif</option>
                 <option value="Lulus">Lulus / Alumni</option>
