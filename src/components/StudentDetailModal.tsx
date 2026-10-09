@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Student, Achievement, Alumni } from '../types';
-import { X, Trophy, GraduationCap, Phone, MapPin, UserCheck, Calendar, BookOpen, Tag, FileText, ExternalLink } from 'lucide-react';
+import { X, Trophy, GraduationCap, UserCheck, FileText, ExternalLink } from 'lucide-react';
 
 interface StudentDetailModalProps {
   student: Student | null;
@@ -12,15 +12,23 @@ interface StudentDetailModalProps {
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   student,
-  achievements,
+  achievements = [],
   alumniRecord,
   isOpen,
   onClose,
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !student) return null;
 
   const studentAchievements = achievements.filter(
-    (a) => a.studentId === student.id || a.studentName.toLowerCase() === student.name.toLowerCase()
+    (a) => a.studentId === student.id || (a.studentName && a.studentName.toLowerCase() === student.name.toLowerCase())
   );
 
   return (
@@ -31,14 +39,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         <div className="bg-slate-900 p-6 border-b border-slate-800 relative text-white">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition"
+            type="button"
+            className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
           <div className="flex items-start space-x-4">
-            <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-2xl shadow-lg border-2 border-white/20">
-              {student.name.charAt(0)}
+            <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-2xl shadow-lg border-2 border-white/20 shrink-0">
+              {student.name ? student.name.charAt(0) : 'S'}
             </div>
             <div>
               <div className="flex items-center space-x-2">
@@ -47,13 +56,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                 }`}>
-                  Status: {student.status}
+                  Status: {student.status || 'Aktif'}
                 </span>
-                <span className="text-xs text-blue-300 font-mono font-bold">NISN: {student.nisn}</span>
+                <span className="text-xs text-blue-300 font-mono font-bold">NISN: {student.nisn || '-'}</span>
               </div>
               <h2 className="text-2xl font-black text-white mt-1">{student.name}</h2>
               <p className="text-xs text-slate-300 font-bold">
-                {student.class} • {student.major} • Angkatan {student.generation}
+                Kelas {student.class || '-'} • Angkatan {student.generation || '-'}
               </p>
             </div>
           </div>
@@ -62,7 +71,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         {/* Content Body */}
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           
-          {/* Section 1: Informasi Akademik & Biodata */}
+          {/* Section 1: Biodata & Kontak */}
           <div>
             <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">
               <UserCheck className="w-4 h-4 text-blue-600" />
@@ -86,18 +95,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px] font-bold">Kebutuhan Khusus / Inklusi:</span>
-                <span className={`font-bold ${student.specialNeeds && student.specialNeeds !== 'Tidak Ada' ? 'text-purple-700 font-extrabold' : 'text-slate-900'}`}>
+                <span className={`font-bold ${student.specialNeeds && !student.specialNeeds.toLowerCase().includes('tidak ada') ? 'text-purple-700 font-extrabold' : 'text-slate-900'}`}>
                   {student.specialNeeds || 'Tidak Ada'}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px] font-bold">Tahun Masuk:</span>
-                <span className="font-bold text-slate-900">{student.entryYear}</span>
+                <span className="font-bold text-slate-900">{student.entryYear || '-'}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px] font-bold">Tempat, Tanggal Lahir:</span>
                 <span className="font-bold text-slate-900">
-                  {student.birthPlace || '-'}, {student.birthDate || '-'}
+                  {student.birthPlace || '-'}{student.birthDate ? `, ${student.birthDate}` : ''}
                 </span>
               </div>
               <div>
@@ -121,7 +130,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Dokumen Berkas (KK & Akta Kelahiran) */}
+          {/* Section 2: Dokumen Berkas */}
           <div>
             <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">
               <FileText className="w-4 h-4 text-blue-600" />
@@ -193,11 +202,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div>
                       <div className="text-xs font-black text-slate-900">{ach.title}</div>
                       <div className="text-[11px] font-bold text-amber-900 mt-0.5">
-                        {ach.rank} • {ach.organizer}
+                        {ach.rank || '-'} {ach.organizer ? `• ${ach.organizer}` : ''}
                       </div>
-                      {ach.description && (
-                        <div className="text-[10px] font-medium text-slate-600 mt-1 italic">{ach.description}</div>
-                      )}
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
                       {ach.level}
@@ -208,7 +214,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             )}
           </div>
 
-          {/* Section 4: Status Alumni Jika Sudah Lulus */}
+          {/* Section 4: Status Alumni */}
           {alumniRecord && (
             <div>
               <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center space-x-2">
@@ -227,12 +233,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <strong className="text-slate-900 font-black">{alumniRecord.institutionName}</strong>
                   </div>
                 )}
-                {alumniRecord.positionOrMajor && (
-                  <div className="flex justify-between">
-                    <span className="font-bold">Program Studi / Jabatan:</span>
-                    <strong className="text-slate-800 font-bold">{alumniRecord.positionOrMajor}</strong>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -243,7 +243,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-black uppercase tracking-wider transition border border-slate-200 shadow-sm"
+            type="button"
+            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-black uppercase tracking-wider transition border border-slate-200 shadow-sm cursor-pointer"
           >
             Tutup Detail
           </button>

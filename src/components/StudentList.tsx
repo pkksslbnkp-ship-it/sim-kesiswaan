@@ -13,7 +13,6 @@ import {
   GraduationCap,
   RotateCcw,
   Users,
-  School,
   ArrowLeftRight
 } from 'lucide-react';
 
@@ -30,7 +29,6 @@ interface StudentListProps {
   onNavigateToImport: () => void;
 }
 
-// Daftar Pilihan Agama Lengkap
 const RELIGION_LIST = [
   'Islam',
   'Kristen',
@@ -41,44 +39,41 @@ const RELIGION_LIST = [
   'Lainnya'
 ];
 
-// Daftar Pilihan Jenis Kekhususan Lengkap
 const SPECIAL_NEEDS_LIST = [
   'Tidak Ada',
-  'Tunanetra',
-  'Tunarungu',
-  'Tunagrahita',
-  'Tunadaksa',
-  'Tunalaras',
-  'Autism',
+  'Tunanetra (A)',
+  'Tunarungu (B)',
+  'Tunagrahita (C)',
+  'Tunadaksa (D)',
+  'Tunalaras (E)',
+  'Autis',
   'ADHD',
   'Kesulitan Belajar',
-  'Tunaganda',
+  'Cerdas Istimewa',
   'Lainnya'
 ];
 
-// 🧠 Helper Cerdas: Ekstraksi Jenjang Pendidikan dari String Kelas
-const getJenjangFromClass = (className: string = ''): 'SD' | 'SMP' | 'SMA' | 'LAINNYA' => {
-  if (!className) return 'LAINNYA';
-  const clean = className.trim().toUpperCase();
+// Helper Ekstraksi Angka Kelas (misal: "11B" -> "11", "7C1" -> "7")
+const extractGradeNumber = (className: string = ''): string => {
+  if (!className) return '';
+  const match = className.trim().match(/\b(10|11|12|[1-9])\b/) || className.trim().match(/^(\d+)/);
+  return match ? match[1] : '';
+};
 
-  // 1. Cek Angka di dalam nama kelas (misal: "10B", "Kelas 7", "1A", "12 IPA")
-  const numMatch = clean.match(/\b(10|11|12|1|2|3|4|5|6|7|8|9)\b/) || clean.match(/^(\d+)/);
-  if (numMatch) {
-    const num = parseInt(numMatch[1], 10);
+// Helper Jenjang Pendidikan
+const getJenjangFromClass = (className: string = ''): 'SD' | 'SMP' | 'SMA' | 'LAINNYA' => {
+  const numStr = extractGradeNumber(className);
+  if (numStr) {
+    const num = parseInt(numStr, 10);
     if (num >= 1 && num <= 6) return 'SD';
     if (num >= 7 && num <= 9) return 'SMP';
     if (num >= 10 && num <= 12) return 'SMA';
   }
 
-  // 2. Cek Angka Romawi (I-VI = SD, VII-IX = SMP, X-XII = SMA)
+  const clean = className.trim().toUpperCase();
   if (/\b(XII|XI|X)\b/.test(clean)) return 'SMA';
   if (/\b(IX|VIII|VII)\b/.test(clean)) return 'SMP';
   if (/\b(VI|V|IV|III|II|I)\b/.test(clean)) return 'SD';
-
-  // 3. Cek Kata Kunci Nama Sekolah/Jenjang
-  if (clean.includes('SD')) return 'SD';
-  if (clean.includes('SMP')) return 'SMP';
-  if (clean.includes('SMA') || clean.includes('SMK') || clean.includes('SLB-C')) return 'SMA';
 
   return 'LAINNYA';
 };
@@ -94,7 +89,6 @@ export const StudentList: React.FC<StudentListProps> = ({
   onMutateStudent,
   onNavigateToImport,
 }) => {
-  // State Filter Multi-Kategori
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<string>('SEMUA');
   const [selectedClass, setSelectedClass] = useState<string>('SEMUA');
@@ -103,20 +97,32 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [selectedSpecialNeeds, setSelectedSpecialNeeds] = useState<string>('SEMUA');
   const [selectedStatus, setSelectedStatus] = useState<string>('SEMUA');
 
-  // 🎯 Opsi Filter Kelas Dinamis (Terfilter Otomatis Jika Jenjang Dipilih)
+  // Daftar Opsi Kelas yang Rapi (Hanya Angka 1-12)
   const classOptions = useMemo(() => {
-    const allClasses = Array.from(new Set(students.map((s) => s.class).filter(Boolean)));
-    
-    if (selectedLevel === 'SEMUA') {
-      return ['SEMUA', ...allClasses.sort()];
-    }
+    const extractedGrades = new Set<number>();
 
-    // Hanya tampilkan kelas yang sesuai dengan jenjang yang dipilih
-    const filteredByLevel = allClasses.filter((cls) => getJenjangFromClass(cls) === selectedLevel);
-    return ['SEMUA', ...filteredByLevel.sort()];
+    students.forEach((s) => {
+      const gradeNum = extractGradeNumber(s.class || '');
+      if (gradeNum) {
+        const num = parseInt(gradeNum, 10);
+        
+        // Filter berdasarkan Jenjang yang dipilih
+        if (selectedLevel === 'SEMUA') {
+          extractedGrades.add(num);
+        } else if (selectedLevel === 'SD' && num >= 1 && num <= 6) {
+          extractedGrades.add(num);
+        } else if (selectedLevel === 'SMP' && num >= 7 && num <= 9) {
+          extractedGrades.add(num);
+        } else if (selectedLevel === 'SMA' && num >= 10 && num <= 12) {
+          extractedGrades.add(num);
+        }
+      }
+    });
+
+    const sorted = Array.from(extractedGrades).sort((a, b) => a - b);
+    return ['SEMUA', ...sorted.map((num) => num.toString())];
   }, [students, selectedLevel]);
 
-  // Reset Semua Filter
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedLevel('SEMUA');
@@ -127,46 +133,85 @@ export const StudentList: React.FC<StudentListProps> = ({
     setSelectedStatus('SEMUA');
   };
 
-  // 🛑 FILTER MULTI-KATEGORI TERMASUK JENJANG SD/SMP/SMA
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
-      const nameMatch = (student.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const nisnMatch = (student.nisn || '').includes(searchTerm);
-      const nisMatch = (student.nis || '').includes(searchTerm);
-      const matchSearch = searchTerm === '' || nameMatch || nisnMatch || nisMatch;
+      if (!student) return false;
 
-      // Filter Jenjang SD, SMP, SMA
+      // 1. Teks Pencarian
+      const term = searchTerm.trim().toLowerCase();
+      const matchSearch =
+        term === '' ||
+        (student.name || '').toLowerCase().includes(term) ||
+        (student.nisn || '').toLowerCase().includes(term) ||
+        (student.nis || '').toLowerCase().includes(term);
+
+      // 2. Filter Jenjang
       const studentJenjang = getJenjangFromClass(student.class || '');
       const matchLevel = selectedLevel === 'SEMUA' || studentJenjang === selectedLevel;
 
-      const matchClass = selectedClass === 'SEMUA' || (student.class || '') === selectedClass;
+      // 3. Filter Kelas Tingkat (Mencocokkan angka kelas, misal "11" cocok dengan "11A", "11B")
+      const studentGradeNum = extractGradeNumber(student.class || '');
+      const matchClass = selectedClass === 'SEMUA' || studentGradeNum === selectedClass;
 
-      // Normalisasi gender ke uppercase ('L' / 'P')
-      const normalizedGender = (student.gender || 'L').toUpperCase();
-      const matchGender = selectedGender === 'SEMUA' || normalizedGender === selectedGender;
+      // 4. Filter Gender
+      const rawGender = (student.gender || 'L').trim().toUpperCase();
+      const matchGender = selectedGender === 'SEMUA' || rawGender === selectedGender;
 
-      const matchReligion = selectedReligion === 'SEMUA' || (student.religion || 'Islam') === selectedReligion;
-      const matchSpecialNeeds = selectedSpecialNeeds === 'SEMUA' || (student.specialNeeds || 'Tidak Ada') === selectedSpecialNeeds;
+      // 5. Filter Agama
+      const matchReligion =
+        selectedReligion === 'SEMUA' ||
+        (student.religion || 'Islam').trim().toLowerCase() === selectedReligion.trim().toLowerCase();
 
-      const studentStatus = student.status || 'Aktif';
-      const matchStatus = selectedStatus === 'SEMUA' || studentStatus.toLowerCase() === selectedStatus.toLowerCase();
+      // 6. Filter Kebutuhan Khusus
+      const rawNeeds = (student.specialNeeds || '').trim().toLowerCase();
+      const cleanNeeds = rawNeeds.replace(/\s*\([^)]*\)/g, '').trim();
+      const isNoNeeds =
+        !rawNeeds ||
+        cleanNeeds === 'tidak ada' ||
+        cleanNeeds === 'tidak ada (non-disabilitas)' ||
+        cleanNeeds === '-' ||
+        cleanNeeds === 'none';
 
-      return matchSearch && matchLevel && matchClass && matchGender && matchReligion && matchSpecialNeeds && matchStatus;
+      let matchSpecialNeeds = false;
+      if (selectedSpecialNeeds === 'SEMUA') {
+        matchSpecialNeeds = true;
+      } else if (selectedSpecialNeeds === 'Tidak Ada') {
+        matchSpecialNeeds = isNoNeeds;
+      } else {
+        const targetClean = selectedSpecialNeeds.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+        matchSpecialNeeds = !isNoNeeds && (cleanNeeds.includes(targetClean) || targetClean.includes(cleanNeeds));
+      }
+
+      // 7. Filter Status
+      const studentStatus = (student.status || 'Aktif').trim().toLowerCase();
+      const matchStatus =
+        selectedStatus === 'SEMUA' || studentStatus === selectedStatus.trim().toLowerCase();
+
+      return (
+        matchSearch &&
+        matchLevel &&
+        matchClass &&
+        matchGender &&
+        matchReligion &&
+        matchSpecialNeeds &&
+        matchStatus
+      );
     });
   }, [students, searchTerm, selectedLevel, selectedClass, selectedGender, selectedReligion, selectedSpecialNeeds, selectedStatus]);
 
-  // Rekapitulasi Data Siswa Hasil Filter
   const rekap = useMemo(() => {
     const total = filteredStudents.length;
     const male = filteredStudents.filter((s) => (s.gender || 'L').toUpperCase() === 'L').length;
     const female = filteredStudents.filter((s) => (s.gender || 'L').toUpperCase() === 'P').length;
     const active = filteredStudents.filter((s) => (s.status || 'Aktif') === 'Aktif').length;
-    const specialNeedsCount = filteredStudents.filter((s) => s.specialNeeds && s.specialNeeds !== 'Tidak Ada').length;
+    const specialNeedsCount = filteredStudents.filter((s) => {
+      const needs = (s.specialNeeds || '').trim().toLowerCase();
+      return needs && needs !== 'tidak ada' && needs !== 'tidak ada (non-disabilitas)' && needs !== '-';
+    }).length;
 
     return { total, male, female, active, specialNeedsCount };
   }, [filteredStudents]);
 
-  // Fungsi Export ke CSV/Excel
   const handleExportExcel = () => {
     if (filteredStudents.length === 0) {
       alert('Tidak ada data siswa untuk di-export.');
@@ -197,11 +242,6 @@ export const StudentList: React.FC<StudentListProps> = ({
     document.body.removeChild(link);
   };
 
-  // Fungsi Cetak PDF
-  const handlePrintPDF = () => {
-    window.print();
-  };
-
   return (
     <div className="space-y-6">
       
@@ -215,11 +255,10 @@ export const StudentList: React.FC<StudentListProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 max-w-xl">
-            Pencarian, filter multi-kategori (Jenjang SD/SMP/SMA, Kelas, Kelamin, Agama, Kebutuhan Khusus, Status), dan pengelolaan biodata kesiswaan.
+            Pencarian, filter multi-kategori (Jenjang, Tingkat Kelas, Kelamin, Agama, Kekhususan, Status), dan pengelolaan data siswa.
           </p>
         </div>
 
-        {/* Action Button Bar */}
         <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto justify-start xl:justify-end">
           <button
             type="button"
@@ -232,11 +271,11 @@ export const StudentList: React.FC<StudentListProps> = ({
 
           <button
             type="button"
-            onClick={handlePrintPDF}
+            onClick={() => window.print()}
             className="flex items-center space-x-1.5 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <Printer className="w-4 h-4 text-rose-500" />
-            <span>Cetak / Export PDF</span>
+            <span>Cetak PDF</span>
           </button>
 
           {userRole === 'ADMIN' && (
@@ -263,7 +302,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       </div>
 
-      {/* Filter Multi-Kategori & Search Bar */}
+      {/* Filter Multi-Kategori Layout Flexible Wrap */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -281,71 +320,71 @@ export const StudentList: React.FC<StudentListProps> = ({
           )}
         </div>
 
-        {/* Grid Input Filters (Responsive Grid) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+        {/* Container Flex Wrap Agar Tulisan Tidak Terpotong */}
+        <div className="flex flex-wrap items-center gap-2.5">
           
-          {/* Pencarian Nama/NISN (Makan 2 Kolom) */}
-          <div className="xl:col-span-2 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Input Cari */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari Nama / NISN / NIS..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none transition"
+              className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none transition"
             />
           </div>
 
-          {/* 🏫 Filter Jenjang (SD, SMP, SMA) */}
-          <div>
+          {/* Jenjang */}
+          <div className="min-w-[130px]">
             <select
               value={selectedLevel}
               onChange={(e) => {
                 setSelectedLevel(e.target.value);
-                setSelectedClass('SEMUA'); // Reset kelas saat jenjang berubah
+                setSelectedClass('SEMUA');
               }}
-              className="w-full px-3 py-2 bg-blue-50/80 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-600 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-blue-50/80 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-600 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Jenjang</option>
-              <option value="SD">🎒 SD (Kelas 1 - 6)</option>
-              <option value="SMP">🏫 SMP (Kelas 7 - 9)</option>
-              <option value="SMA">🎓 SMA/SMK (Kelas 10 - 12)</option>
+              <option value="SD">Jenjang SD</option>
+              <option value="SMP">Jenjang SMP</option>
+              <option value="SMA">Jenjang SMA/SMK</option>
             </select>
           </div>
 
-          {/* Filter Kelas */}
-          <div>
+          {/* Filter Kelas Tingkat 1-12 */}
+          <div className="min-w-[120px]">
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Kelas</option>
               {classOptions.filter(c => c !== 'SEMUA').map((cls) => (
-                <option key={cls} value={cls}>{cls}</option>
+                <option key={cls} value={cls}>Kelas {cls}</option>
               ))}
             </select>
           </div>
 
-          {/* Filter Gender */}
-          <div>
+          {/* Kelamin */}
+          <div className="min-w-[130px]">
             <select
               value={selectedGender}
               onChange={(e) => setSelectedGender(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
-              <option value="SEMUA">Semua Gender</option>
+              <option value="SEMUA">Semua Kelamin</option>
               <option value="L">Laki-Laki (L)</option>
               <option value="P">Perempuan (P)</option>
             </select>
           </div>
 
-          {/* Filter Agama */}
-          <div>
+          {/* Agama */}
+          <div className="min-w-[125px]">
             <select
               value={selectedReligion}
               onChange={(e) => setSelectedReligion(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Agama</option>
               {RELIGION_LIST.map((rel) => (
@@ -354,12 +393,12 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Filter Kebutuhan Khusus */}
-          <div>
+          {/* Kekhususan */}
+          <div className="min-w-[145px]">
             <select
               value={selectedSpecialNeeds}
               onChange={(e) => setSelectedSpecialNeeds(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Kekhususan</option>
               {SPECIAL_NEEDS_LIST.map((need) => (
@@ -368,18 +407,18 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          {/* Filter Status (Dilengkapi dengan opsi Mutasi) */}
-          <div>
+          {/* Status */}
+          <div className="min-w-[120px]">
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Status</option>
               <option value="Aktif">Aktif</option>
               <option value="Mutasi">Mutasi</option>
               <option value="Lulus">Lulus</option>
-              <option value="Non-Aktif">Non-Aktif</option>
+              <option value="Keluar">Keluar</option>
             </select>
           </div>
 
@@ -408,7 +447,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                 filteredStudents.map((student, index) => {
                   const jenjang = getJenjangFromClass(student.class || '');
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={student.id || index} className="hover:bg-slate-50/80 transition">
                       <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
                       <td className="p-4">
                         <div className="font-mono font-bold text-slate-800">{student.nisn || '-'}</div>
@@ -422,7 +461,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-1.5">
-                          {/* Badge Jenjang */}
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                             jenjang === 'SD' 
                               ? 'bg-amber-100 text-amber-800 border border-amber-200' 
@@ -433,7 +471,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                             {jenjang}
                           </span>
                           <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[11px]">
-                            {student.class || '10B'}
+                            {student.class || '-'}
                           </span>
                         </div>
                       </td>
@@ -441,7 +479,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                       <td className="p-4 font-medium text-slate-600">{student.religion || 'Islam'}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          student.specialNeeds && student.specialNeeds !== 'Tidak Ada'
+                          student.specialNeeds && !student.specialNeeds.toLowerCase().includes('tidak ada')
                             ? 'bg-purple-100 text-purple-800 border border-purple-200'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
@@ -509,7 +547,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
                               <button
                                 type="button"
-                                onClick={() => onDeleteStudent(student.id)}
+                                onClick={() => student.id && onDeleteStudent(student.id)}
                                 className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                                 title="Hapus Data Siswa"
                               >
@@ -534,7 +572,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       </div>
 
-      {/* Rekapitulasi Ringkasan Data Siswa */}
+      {/* Rekapitulasi Ringkasan */}
       <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
           <Users className="w-4 h-4 text-blue-400" />
