@@ -524,12 +524,12 @@ export default function App() {
             <AchievementList
               achievements={achievements}
               students={students}
+              alumni={alumni}
               userRole={currentUser.role}
               onAddAchievement={async (newAchData: any) => {
                 try {
                   const certUrl = newAchData.certificateUrl || newAchData.certificate_url || '';
 
-                  // Payload disesuaikan persis dengan skema Supabase (snake_case)
                   const payload: any = {
                     id: `ach-${Date.now()}`,
                     student_id: newAchData.studentId || newAchData.student_id || '',
@@ -555,6 +555,35 @@ export default function App() {
                   }
 
                   alert('Prestasi berhasil disimpan!');
+                  await fetchAllDataFromSupabase();
+                } catch (err: any) {
+                  alert(`Terjadi kesalahan: ${err.message}`);
+                }
+              }}
+              onEditAchievement={async (updatedAchData: any) => {
+                try {
+                  const certUrl = updatedAchData.certificateUrl || updatedAchData.certificate_url || '';
+
+                  const payload: any = {
+                    student_id: updatedAchData.studentId || updatedAchData.student_id || '',
+                    student_name: updatedAchData.studentName || updatedAchData.student_name || '',
+                    title: updatedAchData.title || '',
+                    category: updatedAchData.category || 'Olahraga',
+                    level: updatedAchData.level || 'Kabupaten/Kota',
+                    event: updatedAchData.event || updatedAchData.organizer || '',
+                    rank: updatedAchData.rank || 'Juara 1',
+                    year: String(updatedAchData.year || new Date().getFullYear()),
+                    certificate_url: certUrl || null,
+                  };
+
+                  const { error } = await supabase.from('achievements').update(payload).eq('id', updatedAchData.id);
+
+                  if (error) {
+                    alert(`Gagal memperbarui prestasi: ${error.message}`);
+                    return;
+                  }
+
+                  alert('Prestasi berhasil diperbarui!');
                   await fetchAllDataFromSupabase();
                 } catch (err: any) {
                   alert(`Terjadi kesalahan: ${err.message}`);

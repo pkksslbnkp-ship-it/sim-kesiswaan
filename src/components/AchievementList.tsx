@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Achievement, Student } from '../types';
+import { Achievement, Student, Alumni } from '../types';
 import { 
   Trophy, 
   Search, 
@@ -15,13 +15,18 @@ import {
   X,
   Save,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Upload,
+  User,
+  GraduationCap,
+  PenTool
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseConfig';
 
 interface AchievementListProps {
   achievements: Achievement[];
   students?: Student[];
+  alumni?: Alumni[];
   userRole: 'ADMIN' | 'GURU';
   onAddAchievement: (achievementData: Partial<Achievement>) => void;
   onEditAchievement: (achievementData: Partial<Achievement>) => void;
@@ -31,6 +36,7 @@ interface AchievementListProps {
 export const AchievementList: React.FC<AchievementListProps> = ({
   achievements = [],
   students = [],
+  alumni = [],
   userRole,
   onAddAchievement,
   onEditAchievement,
@@ -44,6 +50,9 @@ export const AchievementList: React.FC<AchievementListProps> = ({
   // State Modal Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Achievement | null>(null);
+
+  // Mode Input Siswa: 'STUDENT' | 'ALUMNI' | 'MANUAL'
+  const [inputMode, setInputMode] = useState<'STUDENT' | 'ALUMNI' | 'MANUAL'>('STUDENT');
 
   // State Form Input
   const [formData, setFormData] = useState<Partial<Achievement>>({
@@ -68,9 +77,12 @@ export const AchievementList: React.FC<AchievementListProps> = ({
   // Handler Buka Modal Tambah Data
   const handleOpenAddModal = () => {
     setEditingItem(null);
+    setInputMode('STUDENT');
+    const defaultStudent = students[0];
+
     setFormData({
-      studentId: students[0]?.id || '',
-      studentName: students[0]?.name || '',
+      studentId: defaultStudent?.id || '',
+      studentName: defaultStudent?.name || '',
       title: '',
       event: '',
       category: 'Olahraga',
@@ -85,7 +97,26 @@ export const AchievementList: React.FC<AchievementListProps> = ({
   // Handler Buka Modal Edit Data
   const handleOpenEditModal = (item: Achievement) => {
     setEditingItem(item);
-    setFormData(item);
+    const sName = item.studentName || (item as any).student_name || '';
+    const sId = item.studentId || (item as any).student_id || '';
+
+    const matchStudent = students.find((s) => s.id === sId || s.name.toLowerCase() === sName.toLowerCase());
+    const matchAlumni = alumni.find((a) => a.id === sId || (a.name || (a as any).full_name || '').toLowerCase() === sName.toLowerCase());
+
+    if (matchStudent) {
+      setInputMode('STUDENT');
+    } else if (matchAlumni) {
+      setInputMode('ALUMNI');
+    } else {
+      setInputMode('MANUAL');
+    }
+
+    setFormData({
+      ...item,
+      studentId: sId,
+      studentName: sName,
+      certificateUrl: item.certificateUrl || (item as any).certificate_url || '',
+    });
     setIsModalOpen(true);
   };
 
@@ -99,8 +130,9 @@ export const AchievementList: React.FC<AchievementListProps> = ({
   // Filter Data
   const filteredAchievements = useMemo(() => {
     return achievements.filter((item) => {
+      const sName = item.studentName || (item as any).student_name || '';
       const matchSearch =
-        (item.studentName && item.studentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        sName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.event && item.event.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -127,7 +159,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
     return { total, nasionalInter, provKab, juaraUtama };
   }, [filteredAchievements]);
 
-  // Handler Select Siswa
+  // Handler Select Siswa Aktif
   const handleStudentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedVal = e.target.value;
     const selectedStudent = students.find((s) => (s.id || (s as any).nisn || s.name) === selectedVal);
@@ -139,21 +171,36 @@ export const AchievementList: React.FC<AchievementListProps> = ({
     }));
   };
 
-  // Handler Upload Sertifikat ke Supabase Storage
+  // Handler Select Alumni
+  const handleAlumniSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedVal = e.target.value;
+    const selectedAlumni = alumni.find((a) => (a.id || a.name || (a as any).full_name) === selectedVal);
+    const alumniName = selectedAlumni ? (selectedAlumni.name || (selectedAlumni as any).full_name) : selectedVal;
+
+    setFormData((prev) => ({
+      ...prev,
+      studentId: selectedAlumni?.id || selectedVal,
+      studentName: alumniName ? `${alumniName} (Alumni)` : selectedVal,
+    }));
+  };
+
+  // Handler Upload Sertifikat ke Supabase Storage (Max 500 KB)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 500 * 1024) {
       alert('Ukuran berkas terlalu besar! Maksimal 500 KB.');
+      e.target.value = '';
       return;
     }
 
     setUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `cert_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      const cleanName = (formData.studentName || 'prestasi').replace(/[^a-zA-Z0-9]/g, '');
+      const fileName = `cert_${cleanName}_${Date.now()}.${fileExt}`;
       const filePath = `certificates/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -174,6 +221,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
       alert(`Gagal mengunggah berkas: ${error.message || 'Terjadi kesalahan'}`);
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -184,9 +232,15 @@ export const AchievementList: React.FC<AchievementListProps> = ({
 
     setDeletingFile(true);
     try {
-      const urlPath = formData.certificateUrl.split('/dokumen-siswa/')[1];
-      if (urlPath) {
-        const decodedPath = decodeURIComponent(urlPath);
+      let relativePath = '';
+      if (formData.certificateUrl.includes('/dokumen-siswa/')) {
+        relativePath = formData.certificateUrl.split('/dokumen-siswa/')[1];
+      } else if (formData.certificateUrl.includes('certificates/')) {
+        relativePath = `certificates/${formData.certificateUrl.split('certificates/')[1]}`;
+      }
+
+      if (relativePath) {
+        const decodedPath = decodeURIComponent(relativePath.split('?')[0]);
         await supabase.storage.from('dokumen-siswa').remove([decodedPath]);
       }
       setFormData((prev) => ({ ...prev, certificateUrl: '' }));
@@ -205,7 +259,6 @@ export const AchievementList: React.FC<AchievementListProps> = ({
       return;
     }
 
-    // Menyiapkan payload yang kompatibel dengan camelCase & snake_case
     const payload = {
       ...formData,
       id: editingItem ? editingItem.id : Date.now().toString(),
@@ -264,7 +317,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Catatan pencapaian, kejuaraan, dan perlombaan yang diraih oleh siswa.
+            Catatan pencapaian, kejuaraan, dan perlombaan yang diraih oleh siswa maupun alumni.
           </p>
         </div>
 
@@ -493,60 +546,162 @@ export const AchievementList: React.FC<AchievementListProps> = ({
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition"
+                className="p-1 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitForm} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* Select Siswa / Nama Siswa */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-800 mb-1">Nama Siswa *</label>
-                  {students && students.length > 0 ? (
+            <form onSubmit={handleSubmitForm} className="p-6 space-y-4 max-h-[78vh] overflow-y-auto">
+              
+              {/* Tab Pilihan Metode Input Siswa */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">Pilih Sumber Data Siswa *</label>
+                <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('STUDENT');
+                      if (students.length > 0) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          studentId: students[0].id || '',
+                          studentName: students[0].name,
+                        }));
+                      }
+                    }}
+                    className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      inputMode === 'STUDENT'
+                        ? 'bg-white text-blue-600 shadow-sm border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>Siswa Aktif</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('ALUMNI');
+                      if (alumni.length > 0) {
+                        const firstAlumniName = alumni[0].name || (alumni[0] as any).full_name || '';
+                        setFormData((prev) => ({
+                          ...prev,
+                          studentId: alumni[0].id || '',
+                          studentName: `${firstAlumniName} (Alumni)`,
+                        }));
+                      }
+                    }}
+                    className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      inputMode === 'ALUMNI'
+                        ? 'bg-white text-purple-600 shadow-sm border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Data Alumni ({alumni.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputMode('MANUAL');
+                      setFormData((prev) => ({
+                        ...prev,
+                        studentId: 'MANUAL',
+                        studentName: '',
+                      }));
+                    }}
+                    className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      inputMode === 'MANUAL'
+                        ? 'bg-white text-amber-600 shadow-sm border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <PenTool className="w-3.5 h-3.5" />
+                    <span>Ketik Manual</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Input Sesuai Mode yang Dipilih */}
+              <div>
+                {inputMode === 'STUDENT' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">Pilih dari Daftar Siswa Aktif *</label>
                     <select
                       value={formData.studentId || formData.studentName || ''}
                       onChange={handleStudentSelect}
                       required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
                     >
-                      <option value="">-- Pilih Siswa --</option>
+                      <option value="">-- Pilih Siswa Aktif --</option>
                       {students.map((s) => {
                         const val = s.id || (s as any).nisn || s.name;
                         return (
                           <option key={val} value={val}>
-                            {s.name} {(s as any).class ? `(${(s as any).class})` : ''}
+                            {s.name} {(s as any).class ? `(Kelas ${s.class})` : ''}
                           </option>
                         );
                       })}
                     </select>
-                  ) : (
+                  </div>
+                )}
+
+                {inputMode === 'ALUMNI' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">Pilih dari Daftar Alumni *</label>
+                    <select
+                      value={formData.studentId || formData.studentName || ''}
+                      onChange={handleAlumniSelect}
+                      required
+                      className="w-full bg-slate-50 border border-purple-200 rounded-xl px-3 py-2.5 text-xs font-bold text-purple-900 focus:outline-none focus:border-purple-500 cursor-pointer"
+                    >
+                      <option value="">-- Pilih Alumni --</option>
+                      {alumni.map((a) => {
+                        const val = a.id || a.name || (a as any).full_name;
+                        const aName = a.name || (a as any).full_name || 'Alumni Tanpa Nama';
+                        const year = a.graduationYear || (a as any).graduation_year || '-';
+                        return (
+                          <option key={val} value={val}>
+                            {aName} (Lulusan {year})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+
+                {inputMode === 'MANUAL' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">Ketikkan Nama Siswa / Tim *</label>
                     <input
                       type="text"
                       required
-                      placeholder="Nama Lengkap Siswa"
+                      placeholder="Masukkan nama siswa atau nama tim..."
                       value={formData.studentName || ''}
                       onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
                     />
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
-                {/* Judul Prestasi */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-800 mb-1">Judul / Kejuaraan *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Juara 1 Lomba Web Design"
-                    value={formData.title || ''}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+              {/* Judul Prestasi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Judul / Kejuaraan *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Juara 1 Lomba Web Design"
+                  value={formData.title || ''}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Event */}
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">Event / Lomba</label>
@@ -555,7 +710,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
                     placeholder="Contoh: O2SN / LKS 2026"
                     value={formData.event || ''}
                     onChange={(e) => setFormData({ ...formData, event: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -565,7 +720,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
                   <select
                     value={formData.category || 'Olahraga'}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Akademik">Akademik</option>
                     <option value="Non-Akademik">Non-Akademik</option>
@@ -581,7 +736,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
                   <select
                     value={formData.level || 'Kabupaten/Kota'}
                     onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Kecamatan">Kecamatan</option>
                     <option value="Kabupaten/Kota">Kabupaten/Kota</option>
@@ -597,7 +752,7 @@ export const AchievementList: React.FC<AchievementListProps> = ({
                   <select
                     value={formData.rank || 'Juara 1'}
                     onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Juara 1">Juara 1</option>
                     <option value="Juara 2">Juara 2</option>
@@ -608,82 +763,92 @@ export const AchievementList: React.FC<AchievementListProps> = ({
                     <option value="Peserta">Peserta / Finalis</option>
                   </select>
                 </div>
+              </div>
 
-                {/* Tahun */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">Tahun Perolehan</label>
-                  <input
-                    type="text"
-                    value={formData.year || ''}
-                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
-                  />
+              {/* Tahun */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Tahun Perolehan</label>
+                <input
+                  type="text"
+                  value={formData.year || ''}
+                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Upload Sertifikat Modern Card */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-slate-800">Upload Sertifikat Penghargaan</label>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Maksimal 500 KB (PDF / Gambar)
+                  </span>
                 </div>
 
-                {/* Upload Sertifikat */}
-                <div className="sm:col-span-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-800">Upload Sertifikat Penghargaan</label>
-                    {formData.certificateUrl && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                  </div>
-                  
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,application/pdf"
-                      onChange={handleFileUpload}
-                      disabled={uploading || deletingFile}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 focus:outline-none cursor-pointer"
-                    />
-                    {uploading && (
-                      <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center text-xs font-bold text-amber-600 space-x-1">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Mengunggah...</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {formData.certificateUrl && (
-                    <div className="flex items-center space-x-3 mt-2">
+                <div className="p-3.5 border border-slate-200 rounded-xl bg-slate-50/60">
+                  {formData.certificateUrl ? (
+                    <div className="flex items-center justify-between bg-white p-2.5 border border-slate-200 rounded-xl">
                       <a
                         href={formData.certificateUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs text-blue-600 underline font-semibold"
+                        className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline truncate mr-2"
                       >
-                        Lihat Sertifikat Terunggah
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="truncate">Lihat Sertifikat Terunggah</span>
                       </a>
                       <button
                         type="button"
                         onClick={handleFileDelete}
                         disabled={deletingFile}
-                        className="text-xs text-rose-600 hover:text-rose-800 font-semibold transition"
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        title="Hapus Sertifikat"
                       >
-                        {deletingFile ? 'Menghapus...' : 'Hapus Berkas'}
+                        {deletingFile ? <Loader2 className="w-4 h-4 animate-spin text-rose-600" /> : <Trash2 className="w-4 h-4" />}
                       </button>
                     </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-amber-500 hover:bg-amber-50/30 transition">
+                      {uploading ? (
+                        <Loader2 className="w-6 h-6 text-amber-600 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                          <span className="text-xs font-bold text-slate-700">Pilih Berkas Sertifikat</span>
+                          <span className="text-[10px] text-slate-400 font-medium">PDF, JPG, PNG (Max 500KB)</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,image/jpeg,image/png"
+                        disabled={uploading}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
                   )}
                 </div>
-
               </div>
 
+              {/* Action Buttons */}
               <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={uploading || deletingFile}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>Simpan Data</span>
                 </button>
               </div>
+
             </form>
 
           </div>
