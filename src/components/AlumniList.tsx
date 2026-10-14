@@ -41,7 +41,7 @@ const DISABILITY_OPTIONS = [
   'Lainnya'
 ];
 
-// Helper Normalisasi Nilai Ketunaan Lama (C/C1 -> Tunagrahita (C), B -> Tunarungu (B))
+// Helper Normalisasi Nilai Ketunaan
 const normalizeDisability = (val: string = ''): string => {
   if (!val) return 'Tunagrahita (C)';
   const clean = val.trim().toUpperCase();
@@ -392,16 +392,16 @@ export const AlumniList: React.FC<AlumniListProps> = ({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="p-3.5 w-10 text-center">NO</th>
-                <th className="p-3.5">TAHUN LULUS</th>
-                <th className="p-3.5">NAMA ALUMNI</th>
-                <th className="p-3.5 text-center">P/L</th>
-                <th className="p-3.5">TTL</th>
-                <th className="p-3.5 text-center">KETUNAAN</th>
-                <th className="p-3.5">NAMA ORTU</th>
-                <th className="p-3.5">ALAMAT</th>
-                <th className="p-3.5">KETERANGAN</th>
-                <th className="p-3.5 text-center">AKSI & IJAZAH</th>
+                <th className="p-3 w-10 text-center">NO</th>
+                <th className="p-3">TAHUN LULUS</th>
+                <th className="p-3">NAMA ALUMNI</th>
+                <th className="p-3 text-center">P/L</th>
+                <th className="p-3">TTL</th>
+                <th className="p-3 text-center">KETUNAAN</th>
+                <th className="p-3">NAMA ORTU</th>
+                <th className="p-3">ALAMAT</th>
+                <th className="p-3">KETERANGAN</th>
+                <th className="p-3 text-center whitespace-nowrap">AKSI & IJAZAH</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -413,29 +413,29 @@ export const AlumniList: React.FC<AlumniListProps> = ({
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3.5 text-center font-medium text-slate-400">{index + 1}</td>
-                      <td className="p-3.5 font-bold text-blue-600">{item.graduationYear || item.graduation_year || '-'}</td>
-                      <td className="p-3.5 font-bold text-slate-800">{item.name}</td>
-                      <td className="p-3.5 text-center font-semibold">{item.gender}</td>
-                      <td className="p-3.5 text-slate-600">
+                      <td className="p-3 text-center font-medium text-slate-400">{index + 1}</td>
+                      <td className="p-3 font-bold text-blue-600 whitespace-nowrap">{item.graduationYear || item.graduation_year || '-'}</td>
+                      <td className="p-3 font-bold text-slate-800 max-w-[150px] truncate" title={item.name}>{item.name}</td>
+                      <td className="p-3 text-center font-semibold">{item.gender}</td>
+                      <td className="p-3 text-slate-600 whitespace-nowrap">
                         {item.birthPlace || item.birth_place ? `${item.birthPlace || item.birth_place}, ` : ''}
                         {item.birthDate || item.birth_date || '-'}
                       </td>
-                      <td className="p-3.5 text-center font-bold text-purple-700 bg-purple-50 rounded-md">
+                      <td className="p-3 text-center font-bold text-purple-700 bg-purple-50 rounded-md whitespace-nowrap">
                         {displayDisability}
                       </td>
-                      <td className="p-3.5 font-medium text-slate-700">{item.parentName || item.parent_name || '-'}</td>
-                      <td className="p-3.5 text-slate-500 max-w-xs truncate" title={item.address}>{item.address || '-'}</td>
-                      <td className="p-3.5 font-semibold text-emerald-700">{item.notes || item.currentStatus || '-'}</td>
-                      <td className="p-3.5 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
+                      <td className="p-3 font-medium text-slate-700 max-w-[120px] truncate" title={item.parentName || item.parent_name || '-'}>{item.parentName || item.parent_name || '-'}</td>
+                      <td className="p-3 text-slate-500 max-w-[180px] truncate" title={item.address}>{item.address || '-'}</td>
+                      <td className="p-3 font-semibold text-emerald-700 max-w-[140px] truncate" title={item.notes || item.currentStatus || '-'}>{item.notes || item.currentStatus || '-'}</td>
+                      <td className="p-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center space-x-1">
                           <button
                             type="button"
                             onClick={() => setDetailAlumni(item)}
-                            className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                            className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                             title="Lihat Detail Alumni"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
 
                           {ijazahUrl ? (
@@ -443,18 +443,18 @@ export const AlumniList: React.FC<AlumniListProps> = ({
                               href={ijazahUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
+                              className="p-1 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
                               title="Ijazah Terunggah - Klik untuk Lihat Berkas"
                             >
-                              <FileCheck className="w-4 h-4 text-purple-600" />
+                              <FileCheck className="w-3.5 h-3.5 text-purple-600" />
                               <span>IJAZAH</span>
                             </a>
                           ) : (
                             <span 
-                              className="p-1.5 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
+                              className="p-1 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
                               title="Ijazah Belum Diunggah"
                             >
-                              <FileCheck className="w-4 h-4 text-slate-300" />
+                              <FileCheck className="w-3.5 h-3.5 text-slate-300" />
                               <span>IJAZAH</span>
                             </span>
                           )}
@@ -464,18 +464,18 @@ export const AlumniList: React.FC<AlumniListProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(item)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                                 title="Edit Alumni"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => onDeleteAlumni(item.id)}
-                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                                 title="Hapus Alumni"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
@@ -575,8 +575,6 @@ export const AlumniList: React.FC<AlumniListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                
-                {/* Dropdown Ketunaan */}
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jenis Ketunaan</label>
                   <select

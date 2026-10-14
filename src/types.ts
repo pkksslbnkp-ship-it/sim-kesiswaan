@@ -91,6 +91,7 @@ export interface Alumni {
   address?: string;
   notes?: string;
   updatedAt: string;
+  ijazahUrl?: string;
 }
 
 export interface ActivityLog {

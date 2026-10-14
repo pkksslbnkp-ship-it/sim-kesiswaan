@@ -339,16 +339,16 @@ export const AchievementList: React.FC<AchievementListProps> = ({
             <span>Cetak PDF</span>
           </button>
           
-          {userRole === 'ADMIN' && (
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="flex items-center space-x-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Tambah Prestasi</span>
-            </button>
-          )}
+{userRole === 'ADMIN' && (
+  <button
+    type="button"
+    onClick={handleOpenAddModal}
+    className="flex items-center space-x-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+  >
+    <Plus className="w-4 h-4" />
+    <span>Tambah Prestasi</span>
+  </button>
+)}
         </div>
       </div>
 

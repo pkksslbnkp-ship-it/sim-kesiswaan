@@ -107,7 +107,7 @@ export default function App() {
         setUsers(userData as User[]);
       }
 
-      // Fetch Achievements (Pemetaan snake_case -> camelCase)
+      // Fetch Achievements
       const { data: achData, error: achErr } = await supabase
         .from('achievements')
         .select('*')
@@ -133,7 +133,7 @@ export default function App() {
         setAchievements(formattedAchievements);
       }
 
-      // Fetch Alumni dengan Pemetaan Kolom Supabase
+      // Fetch Alumni
       const { data: almData, error: almErr } = await supabase
         .from('alumni')
         .select('*')
@@ -156,8 +156,7 @@ export default function App() {
           notes: item.notes || '',
           phone: item.phone || '',
           currentStatus: item.current_status || item.currentStatus || 'Kerja/Wirausaha',
-          institutionName: item.institution_name || item.institutionName || '',
-          positionOrMajor: item.position_or_major || item.positionOrMajor || '',
+          ijazahUrl: item.ijazah_url || item.ijazahUrl || '',
           updatedAt: item.updated_at || item.updatedAt || new Date().toISOString(),
         }));
         setAlumni(formattedAlumni);
@@ -288,7 +287,7 @@ export default function App() {
     });
   };
 
-  // 4. HANDLER KHUSUS ALUMNI (TAMBAH, EDIT, HAPUS)
+  // 4. HANDLER KHUSUS ALUMNI
   const handleAddAlumni = async (data: Partial<Alumni>) => {
     const payload = {
       id: `alm-${Date.now()}`,
@@ -302,6 +301,7 @@ export default function App() {
       address: data.address || '',
       notes: data.notes || '',
       phone: data.phone || '',
+      ijazah_url: (data as any).ijazahUrl || '',
       current_status: data.currentStatus || 'Kerja/Wirausaha',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -328,6 +328,7 @@ export default function App() {
       address: data.address,
       notes: data.notes,
       phone: data.phone,
+      ijazah_url: (data as any).ijazahUrl,
       current_status: data.currentStatus,
       updated_at: new Date().toISOString(),
     };
@@ -435,7 +436,8 @@ export default function App() {
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row gap-6 p-4 sm:p-6 lg:p-8">
+      {/* Kontainer Utama Diperlebar ke max-w-[1600px] agar Layar Luas & Tidak Terpotong */}
+      <div className="flex-1 max-w-[1600px] w-full mx-auto flex flex-col md:flex-row gap-6 p-4 sm:p-6 lg:p-8">
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -450,7 +452,7 @@ export default function App() {
           }}
         />
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-x-auto min-w-0">
           {activeTab === 'dashboard' && (
             <Dashboard
               students={students}

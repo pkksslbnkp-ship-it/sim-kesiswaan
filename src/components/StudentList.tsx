@@ -313,7 +313,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -324,14 +324,14 @@ export const StudentList: React.FC<StudentListProps> = ({
             />
           </div>
 
-          <div className="min-w-[130px]">
+          <div className="min-w-[120px]">
             <select
               value={selectedLevel}
               onChange={(e) => {
                 setSelectedLevel(e.target.value);
                 setSelectedClass('SEMUA');
               }}
-              className="w-full px-2.5 py-2 bg-blue-50/80 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-600 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-blue-50/80 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-600 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Jenjang</option>
               <option value="SD">Jenjang SD</option>
@@ -340,11 +340,11 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          <div className="min-w-[120px]">
+          <div className="min-w-[110px]">
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Kelas</option>
               {classOptions.filter(c => c !== 'SEMUA').map((cls) => (
@@ -353,11 +353,11 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          <div className="min-w-[130px]">
+          <div className="min-w-[120px]">
             <select
               value={selectedGender}
               onChange={(e) => setSelectedGender(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Kelamin</option>
               <option value="L">Laki-Laki (L)</option>
@@ -365,11 +365,11 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          <div className="min-w-[125px]">
+          <div className="min-w-[115px]">
             <select
               value={selectedReligion}
               onChange={(e) => setSelectedReligion(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Agama</option>
               {RELIGION_LIST.map((rel) => (
@@ -378,11 +378,11 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          <div className="min-w-[145px]">
+          <div className="min-w-[135px]">
             <select
               value={selectedSpecialNeeds}
               onChange={(e) => setSelectedSpecialNeeds(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Kekhususan</option>
               {SPECIAL_NEEDS_LIST.map((need) => (
@@ -391,11 +391,11 @@ export const StudentList: React.FC<StudentListProps> = ({
             </select>
           </div>
 
-          <div className="min-w-[120px]">
+          <div className="min-w-[110px]">
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
+              className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none transition cursor-pointer"
             >
               <option value="SEMUA">Semua Status</option>
               <option value="Aktif">Aktif</option>
@@ -414,15 +414,15 @@ export const StudentList: React.FC<StudentListProps> = ({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="p-4 w-12 text-center">NO</th>
-                <th className="p-4">NISN / NIS</th>
-                <th className="p-4">NAMA SISWA</th>
-                <th className="p-4">JENJANG / KELAS</th>
-                <th className="p-4">GENDER</th>
-                <th className="p-4">AGAMA</th>
-                <th className="p-4">KEKHUSUSAN</th>
-                <th className="p-4">STATUS</th>
-                <th className="p-4 text-center">AKSI & BERKAS</th>
+                <th className="p-3 w-10 text-center">NO</th>
+                <th className="p-3">NISN / NIS</th>
+                <th className="p-3">NAMA SISWA</th>
+                <th className="p-3">KELAS</th>
+                <th className="p-3 text-center">P/L</th>
+                <th className="p-3">AGAMA</th>
+                <th className="p-3">KEKHUSUSAN</th>
+                <th className="p-3">STATUS</th>
+                <th className="p-3 text-center whitespace-nowrap">AKSI & BERKAS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -434,20 +434,21 @@ export const StudentList: React.FC<StudentListProps> = ({
 
                   return (
                     <tr key={student.id || index} className="hover:bg-slate-50/80 transition">
-                      <td className="p-4 text-center font-medium text-slate-400">{index + 1}</td>
-                      <td className="p-4">
+                      <td className="p-3 text-center font-medium text-slate-400">{index + 1}</td>
+                      <td className="p-3 whitespace-nowrap">
                         <div className="font-mono font-bold text-slate-800">{student.nisn || '-'}</div>
                         <div className="text-[10px] text-slate-400 font-mono">{student.nis || '-'}</div>
                       </td>
                       <td 
                         onClick={() => onViewStudentDetail(student)}
-                        className="p-4 font-bold text-slate-800 hover:text-blue-600 cursor-pointer transition"
+                        className="p-3 font-bold text-slate-800 hover:text-blue-600 cursor-pointer transition max-w-[180px] truncate"
+                        title={student.name}
                       >
                         {student.name}
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
                             jenjang === 'SD' 
                               ? 'bg-amber-100 text-amber-800 border border-amber-200' 
                               : jenjang === 'SMP'
@@ -456,14 +457,14 @@ export const StudentList: React.FC<StudentListProps> = ({
                           }`}>
                             {jenjang}
                           </span>
-                          <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[11px]">
+                          <span className="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
                             {student.class || '-'}
                           </span>
                         </div>
                       </td>
-                      <td className="p-4 font-semibold text-slate-600">{(student.gender || 'L').toUpperCase()}</td>
-                      <td className="p-4 font-medium text-slate-600">{student.religion || 'Islam'}</td>
-                      <td className="p-4">
+                      <td className="p-3 text-center font-semibold text-slate-600">{(student.gender || 'L').toUpperCase()}</td>
+                      <td className="p-3 font-medium text-slate-600 whitespace-nowrap">{student.religion || 'Islam'}</td>
+                      <td className="p-3 max-w-[140px] truncate" title={student.specialNeeds || 'Tidak Ada'}>
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                           student.specialNeeds && !student.specialNeeds.toLowerCase().includes('tidak ada')
                             ? 'bg-purple-100 text-purple-800 border border-purple-200'
@@ -472,8 +473,8 @@ export const StudentList: React.FC<StudentListProps> = ({
                           {student.specialNeeds || 'Tidak Ada'}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
                           student.status === 'Aktif' || !student.status
                             ? 'bg-emerald-100 text-emerald-800' 
                             : student.status === 'Lulus'
@@ -485,17 +486,17 @@ export const StudentList: React.FC<StudentListProps> = ({
                           {student.status || 'Aktif'}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
+                      <td className="p-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center space-x-1">
                           
                           {/* Tombol Detail (Mata) */}
                           <button
                             type="button"
                             onClick={() => onViewStudentDetail(student)}
-                            className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                            className="p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                             title="Lihat Detail Siswa"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Icon Indikator Berkas KK */}
@@ -504,18 +505,18 @@ export const StudentList: React.FC<StudentListProps> = ({
                               href={student.kkUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
+                              className="p-1 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
                               title="Kartu Keluarga (KK) Terunggah - Klik untuk Buka"
                             >
-                              <FileText className="w-4 h-4 text-emerald-600" />
+                              <FileText className="w-3.5 h-3.5 text-emerald-600" />
                               <span>KK</span>
                             </a>
                           ) : (
                             <span 
-                              className="p-1.5 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
+                              className="p-1 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
                               title="Kartu Keluarga (KK) Belum Diunggah"
                             >
-                              <FileText className="w-4 h-4 text-slate-300" />
+                              <FileText className="w-3.5 h-3.5 text-slate-300" />
                               <span>KK</span>
                             </span>
                           )}
@@ -526,18 +527,18 @@ export const StudentList: React.FC<StudentListProps> = ({
                               href={student.akteUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
+                              className="p-1 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer flex items-center gap-0.5 font-black text-[10px]"
                               title="Akta Kelahiran Terunggah - Klik untuk Buka"
                             >
-                              <FileBadge className="w-4 h-4 text-blue-600" />
+                              <FileBadge className="w-3.5 h-3.5 text-blue-600" />
                               <span>AKTA</span>
                             </a>
                           ) : (
                             <span 
-                              className="p-1.5 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
+                              className="p-1 text-slate-300 rounded-lg flex items-center gap-0.5 font-bold text-[10px] cursor-not-allowed"
                               title="Akta Kelahiran Belum Diunggah"
                             >
-                              <FileBadge className="w-4 h-4 text-slate-300" />
+                              <FileBadge className="w-3.5 h-3.5 text-slate-300" />
                               <span>AKTA</span>
                             </span>
                           )}
@@ -547,10 +548,10 @@ export const StudentList: React.FC<StudentListProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onEditStudent(student)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                                 title="Edit Data Siswa"
                               >
-                                <Edit2 className="w-4 h-4" />
+                                <Edit2 className="w-3.5 h-3.5" />
                               </button>
 
                               {(student.status === 'Aktif' || !student.status) && (
@@ -558,20 +559,20 @@ export const StudentList: React.FC<StudentListProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => onGraduateStudent(student)}
-                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
                                     title="Luluskan Siswa ke Alumni"
                                   >
-                                    <GraduationCap className="w-4 h-4" />
+                                    <GraduationCap className="w-3.5 h-3.5" />
                                   </button>
 
                                   {onMutateStudent && (
                                     <button
                                       type="button"
                                       onClick={() => onMutateStudent(student)}
-                                      className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                      className="p-1 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
                                       title="Mutasikan Siswa (Pindah Sekolah)"
                                     >
-                                      <ArrowLeftRight className="w-4 h-4" />
+                                      <ArrowLeftRight className="w-3.5 h-3.5" />
                                     </button>
                                   )}
                                 </>
@@ -580,10 +581,10 @@ export const StudentList: React.FC<StudentListProps> = ({
                               <button
                                 type="button"
                                 onClick={() => student.id && onDeleteStudent(student.id)}
-                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                                 title="Hapus Data Siswa"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
