@@ -15,7 +15,8 @@ import {
   Users,
   ArrowLeftRight,
   FileText,
-  FileBadge
+  FileBadge,
+  Sparkles
 } from 'lucide-react';
 
 interface StudentListProps {
@@ -191,17 +192,51 @@ export const StudentList: React.FC<StudentListProps> = ({
     });
   }, [students, searchTerm, selectedLevel, selectedClass, selectedGender, selectedReligion, selectedSpecialNeeds, selectedStatus]);
 
+  // Hitung Rincian Detail Kekhususan Siswa
   const rekap = useMemo(() => {
     const total = filteredStudents.length;
     const male = filteredStudents.filter((s) => (s.gender || 'L').toUpperCase() === 'L').length;
     const female = filteredStudents.filter((s) => (s.gender || 'L').toUpperCase() === 'P').length;
     const active = filteredStudents.filter((s) => (s.status || 'Aktif') === 'Aktif').length;
-    const specialNeedsCount = filteredStudents.filter((s) => {
-      const needs = (s.specialNeeds || '').trim().toLowerCase();
-      return needs && needs !== 'tidak ada' && needs !== 'tidak ada (non-disabilitas)' && needs !== '-';
-    }).length;
 
-    return { total, male, female, active, specialNeedsCount };
+    const breakdown: Record<string, number> = {
+      'Tunanetra (A)': 0,
+      'Tunarungu (B)': 0,
+      'Tunagrahita (C)': 0,
+      'Tunadaksa (D)': 0,
+      'Tunalaras (E)': 0,
+      'Autis': 0,
+      'ADHD': 0,
+      'Kesulitan Belajar': 0,
+      'Cerdas Istimewa': 0,
+      'Lainnya': 0,
+    };
+
+    let totalSpecialNeeds = 0;
+
+    filteredStudents.forEach((s) => {
+      const needs = (s.specialNeeds || '').trim();
+      const lower = needs.toLowerCase();
+
+      if (!needs || lower.includes('tidak ada') || lower === '-' || lower === 'none') {
+        return;
+      }
+
+      totalSpecialNeeds++;
+
+      if (lower.includes('tunanetra') || lower === 'a') breakdown['Tunanetra (A)']++;
+      else if (lower.includes('tunarungu') || lower === 'b') breakdown['Tunarungu (B)']++;
+      else if (lower.includes('tunagrahita') || lower === 'c' || lower === 'c1') breakdown['Tunagrahita (C)']++;
+      else if (lower.includes('tunadaksa') || lower === 'd') breakdown['Tunadaksa (D)']++;
+      else if (lower.includes('tunalaras') || lower === 'e') breakdown['Tunalaras (E)']++;
+      else if (lower.includes('autis')) breakdown['Autis']++;
+      else if (lower.includes('adhd')) breakdown['ADHD']++;
+      else if (lower.includes('kesulitan belajar')) breakdown['Kesulitan Belajar']++;
+      else if (lower.includes('cerdas istimewa') || lower.includes('gifted')) breakdown['Cerdas Istimewa']++;
+      else breakdown['Lainnya']++;
+    });
+
+    return { total, male, female, active, totalSpecialNeeds, breakdown };
   }, [filteredStudents]);
 
   const handleExportExcel = () => {
@@ -605,14 +640,15 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       </div>
 
-      {/* Rekapitulasi Ringkasan */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center space-x-2">
+      {/* Rekapitulasi Ringkasan & Detail Kekhususan */}
+      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 space-y-5">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center space-x-2">
           <Users className="w-4 h-4 text-blue-400" />
           <span>Rekapitulasi Hasil Filter Data Siswa ({selectedLevel === 'SEMUA' ? 'Semua Jenjang' : `Jenjang ${selectedLevel}`})</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+        {/* Ringkasan Utama */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
             <span className="block text-[10px] text-slate-400 font-bold uppercase">Total Terfilter</span>
             <span className="text-xl font-black text-white mt-0.5 block">{rekap.total}</span>
@@ -634,10 +670,39 @@ export const StudentList: React.FC<StudentListProps> = ({
           </div>
 
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 col-span-2 sm:col-span-1">
-            <span className="block text-[10px] text-slate-400 font-bold uppercase">Kebutuhan Khusus</span>
-            <span className="text-xl font-black text-purple-400 mt-0.5 block">{rekap.specialNeedsCount}</span>
+            <span className="block text-[10px] text-slate-400 font-bold uppercase">Total Kekhususan</span>
+            <span className="text-xl font-black text-purple-400 mt-0.5 block">{rekap.totalSpecialNeeds}</span>
           </div>
         </div>
+
+        {/* Rincian Jenis Kekhususan Detail */}
+        <div className="pt-3 border-t border-slate-800">
+          <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-300 uppercase tracking-wider mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>Rincian Jenis Kebutuhan Khusus / Kekhususan</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {Object.entries(rekap.breakdown).map(([label, count]) => (
+              <div 
+                key={label} 
+                className={`p-2.5 rounded-xl border transition flex items-center justify-between ${
+                  count > 0 
+                    ? 'bg-purple-950/40 border-purple-500/40 text-purple-200' 
+                    : 'bg-slate-800/40 border-slate-700/30 text-slate-500'
+                }`}
+              >
+                <span className="text-[11px] font-bold truncate pr-1">{label}</span>
+                <span className={`text-xs font-black px-2 py-0.5 rounded-md ${
+                  count > 0 ? 'bg-purple-500/30 text-purple-200' : 'bg-slate-700/40 text-slate-500'
+                }`}>
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
 
     </div>
