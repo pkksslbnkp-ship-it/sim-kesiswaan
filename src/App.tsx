@@ -287,9 +287,9 @@ export default function App() {
     });
   };
 
-  // 4. HANDLER KHUSUS ALUMNI
+  // 4. HANDLER ALUMNI (AMABU DARI MISSING COLUMN IJAZAH_URL)
   const handleAddAlumni = async (data: Partial<Alumni>) => {
-    const payload = {
+    const payload: any = {
       id: `alm-${Date.now()}`,
       name: data.name,
       gender: data.gender || 'L',
@@ -301,23 +301,36 @@ export default function App() {
       address: data.address || '',
       notes: data.notes || '',
       phone: data.phone || '',
-      ijazah_url: (data as any).ijazahUrl || '',
       current_status: data.currentStatus || 'Kerja/Wirausaha',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('alumni').insert([payload]);
+    // Tambahkan ijazah_url hanya jika terisi agar tidak error bila kolom belum dibuat di DB
+    if ((data as any).ijazahUrl) {
+      payload.ijazah_url = (data as any).ijazahUrl;
+    }
+
+    let { error } = await supabase.from('alumni').insert([payload]);
+
+    // Jika error akibat ijazah_url belum ada di Supabase, coba insert tanpa field ijazah_url
+    if (error && error.message && error.message.includes('ijazah_url')) {
+      delete payload.ijazah_url;
+      const retry = await supabase.from('alumni').insert([payload]);
+      error = retry.error;
+    }
+
     if (error) {
       alert(`Gagal menambah alumni: ${error.message}`);
     } else {
+      alert('Berhasil menambah alumni!');
       await fetchAllDataFromSupabase();
     }
   };
 
   const handleEditAlumni = async (data: Partial<Alumni>) => {
     if (!data.id) return;
-    const payload = {
+    const payload: any = {
       name: data.name,
       gender: data.gender,
       graduation_year: (data as any).graduationYear,
@@ -328,15 +341,26 @@ export default function App() {
       address: data.address,
       notes: data.notes,
       phone: data.phone,
-      ijazah_url: (data as any).ijazahUrl,
       current_status: data.currentStatus,
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('alumni').update(payload).eq('id', data.id);
+    if ((data as any).ijazahUrl) {
+      payload.ijazah_url = (data as any).ijazahUrl;
+    }
+
+    let { error } = await supabase.from('alumni').update(payload).eq('id', data.id);
+
+    if (error && error.message && error.message.includes('ijazah_url')) {
+      delete payload.ijazah_url;
+      const retry = await supabase.from('alumni').update(payload).eq('id', data.id);
+      error = retry.error;
+    }
+
     if (error) {
       alert(`Gagal memperbarui alumni: ${error.message}`);
     } else {
+      alert('Berhasil memperbarui alumni!');
       await fetchAllDataFromSupabase();
     }
   };
@@ -436,7 +460,6 @@ export default function App() {
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
 
-      {/* Kontainer Utama Diperlebar ke max-w-[1600px] agar Layar Luas & Tidak Terpotong */}
       <div className="flex-1 max-w-[1600px] w-full mx-auto flex flex-col md:flex-row gap-6 p-4 sm:p-6 lg:p-8">
         <Sidebar
           activeTab={activeTab}
